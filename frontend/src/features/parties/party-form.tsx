@@ -1,0 +1,468 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
+import { useState } from "react";
+import { Controller, useForm, useWatch, type Control, type FieldErrors } from "react-hook-form";
+import { Button, buttonClasses } from "@/components/ui/button";
+import { FilterChip } from "@/components/ui/filter-chip";
+import { FilterGroup } from "@/components/ui/filter-group";
+import { FormMessage } from "@/components/ui/form-message";
+import { CardTitle } from "@/components/ui/glass-card";
+import { VoucherSteps } from "@/components/ui/voucher-steps";
+import { SelectField } from "@/components/ui/select-field";
+import { TextField } from "@/components/ui/text-field";
+import { ApiError } from "@/lib/api-client";
+import { GST_TREATMENTS, needsGstin } from "@/features/gst/gst-rules";
+import { checkGstin, gstinPan, gstinStateCode } from "@/features/gst/gstin";
+import { INDIAN_STATES, stateName } from "@/features/gst/indian-states";
+import { ROLE_TEXT, taxProfileOf } from "./party-rules";
+import { partySchema, type PartyFormValues } from "./party-schema";
+import { toPartyValues } from "./party-form-values";
+import { BranchesCard, ContactsCard, LicencesCard } from "./party-places-cards";
+import { PartyTaxPreview } from "./party-tax-preview";
+import type { Party, PartyRole } from "./types";
+import type { OurRegistration } from "@/types/company";
+
+interface PartyFormProps {
+  /** Which list the form was opened from; it is ticked for a new party. */
+  role: PartyRole;
+  party?: Party;
+  company: OurRegistration;
+  /** Saves through the backend; throws an ApiError the form shows. */
+  onSave: (values: PartyFormValues) => Promise<void>;
+  /** Archives or restores a saved party. */
+  onArchive?: (archived: boolean) => Promise<void>;
+}
+
+const errorText = (error: unknown) =>
+  error instanceof ApiError ? error.message : "Could not save. Check the connection and try again.";
+
+/** What the Udyam details mean for payments (MSMED Act s.15, Income-tax s.43B(h)). */
+function MsmeNote({ control, isVendor }: { control: Control<PartyFormValues>; isVendor: boolean }) {
+  const [category, activity] = useWatch({ control, name: ["msmeCategory", "msmeActivity"] });
+  const covered = category !== "medium" && activity !== "trading";
+  const text = covered
+    ? isVendor
+      ? `Bills from them are due within 45 days at most${category && activity ? "" : " (pick the enterprise and activity to be sure)"}; unpaid past that at year end is disallowed under s.43B(h).`
+      : "They are a micro or small enterprise: their bills to us fall under the 45-day rule."
+    : category === "medium"
+      ? "Medium enterprises are not covered by the 45-day rule; their own credit days apply."
+      : "Traders registered on Udyam are not covered by the 45-day rule; their own credit days apply.";
+  return <p className="text-xs font-semibold text-muted">{text}</p>;
+}
+
+/** The first step holding a field that failed, to open it. */
+const stepOfErrors = (errors: FieldErrors<PartyFormValues>) =>
+  errors.roles || errors.displayName || errors.legalName || errors.contactPerson || errors.phone || errors.email
+    ? 0
+    : errors.treatment || errors.gstin || errors.pan || errors.country || errors.foreignTaxId || errors.placeOfSupply || errors.transin || errors.addressLine || errors.city || errors.pin
+      ? 1
+      : errors.branches || errors.contacts || errors.licences
+        ? 2
+        : 3;
+
+// The contact form for customers and vendors. GST treatment decides
+// which fields show: a GSTIN fills in the state and PAN, an overseas party
+// gets country, tax ID and export route instead of a place of supply.
+export function PartyForm({ role, party, company, onSave, onArchive }: PartyFormProps) {
+  const [result, setResult] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const {
+    register,
+    control,
+    handleSubmit,
+    setValue,
+    reset,
+    formState: { errors, isSubmitting, isDirty },
+  } = useForm<PartyFormValues>({ resolver: zodResolver(partySchema), defaultValues: toPartyValues(role, party) });
+
+  const [roles, treatment, gstin, placeOfSupply, exportRoute, isGta, balanceSide, udyamNumber] = useWatch({
+    control,
+    name: ["roles", "treatment", "gstin", "placeOfSupply", "exportRoute", "isGta", "openingBalanceSide", "udyamNumber"],
+  });
+  const [archiving, setArchiving] = useState(false);
+  const [step, setStep] = useState(0);
+  const displayName = useWatch({ control, name: "displayName" });
+  const isCustomer = roles.includes("customer");
+  const isVendor = roles.includes("vendor");
+  const overseas = treatment === "overseas";
+  const gstinCheck = gstin ? checkGstin(gstin) : undefined;
+
+  const onGstinChange = (value: string) => {
+    const upper = value.toUpperCase();
+    setValue("gstin", upper, { shouldDirty: true });
+    if (checkGstin(upper).valid) {
+      setValue("pan", gstinPan(upper), { shouldDirty: true });
+      if (treatment !== "sez") setValue("placeOfSupply", gstinStateCode(upper), { shouldDirty: true, shouldValidate: true });
+    }
+  };
+
+  const toggleRole = (toggled: PartyRole) =>
+    setValue("roles", roles.includes(toggled) ? roles.filter((existing) => existing !== toggled) : [...roles, toggled], {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+
+  const onSubmit = handleSubmit(
+    async (values) => {
+      setResult(null);
+      try {
+        await onSave(values);
+        reset(values);
+        setResult({ tone: "success", text: `${values.displayName} saved.` });
+      } catch (error) {
+        setResult({ tone: "error", text: errorText(error) });
+      }
+    },
+    (failed) => {
+      setStep(stepOfErrors(failed));
+      setResult({ tone: "error", text: "Some fields need attention. The step marked red has them." });
+    },
+  );
+
+  const toggleArchived = async () => {
+    if (!party || !onArchive) return;
+    setArchiving(true);
+    try {
+      await onArchive(!party.archived);
+      setResult({ tone: "success", text: `${party.displayName} ${party.archived ? "restored" : "archived"}.` });
+    } catch (error) {
+      setResult({ tone: "error", text: errorText(error) });
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  const balanceLabel =
+    isCustomer && isVendor ? "Opening balance (₹)" : isCustomer ? "Opening balance they owe (₹)" : "Opening balance we owe (₹)";
+
+  const stateOptions = INDIAN_STATES.map((state) => ({ value: state.code, label: `${state.name} (${state.code})` }));
+
+  // Four steps that each fit the screen, worked like a voucher: Enter walks
+  // the fields, PgDn the steps, Ctrl+A saves from any step (client, 13 Nov 2026).
+  return (
+    <form onSubmit={onSubmit} noValidate>
+      <VoucherSteps
+        heading={<CardTitle>{party ? party.displayName : `New ${ROLE_TEXT[role].one}`}</CardTitle>}
+        step={step}
+        onStepChange={setStep}
+        onAccept={() => void onSubmit()}
+        steps={[
+          {
+            id: "who",
+            title: "Who they are",
+            summary: displayName || undefined,
+            invalid: Boolean(errors.roles || errors.displayName || errors.legalName || errors.contactPerson || errors.phone || errors.email),
+            content: (
+              <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-medium text-muted">This party is a</span>
+                      <FilterGroup label="This party is a">
+                        <FilterChip selected={isCustomer} onClick={() => toggleRole("customer")}>
+                          Customer
+                        </FilterChip>
+                        <FilterChip selected={isVendor} onClick={() => toggleRole("vendor")}>
+                          Vendor
+                        </FilterChip>
+                      </FilterGroup>
+                      {errors.roles && <span className="text-xs font-semibold text-danger-strong">{errors.roles.message}</span>}
+                    </div>
+                    <div className="grid gap-x-3.5 gap-y-3 @xl:grid-cols-2 @4xl:grid-cols-3">
+                      <TextField label="Display name" placeholder="Shown on quotations and invoices" error={errors.displayName?.message} {...register("displayName")} />
+                      <TextField label="Legal name" placeholder="As registered, if different" error={errors.legalName?.message} {...register("legalName")} />
+                      <TextField label="Contact person" error={errors.contactPerson?.message} {...register("contactPerson")} />
+                      <Controller
+                        control={control}
+                        name="kind"
+                        render={({ field }) => (
+                          <SelectField
+                            label="Type"
+                            options={[
+                              { value: "business", label: "Business" },
+                              { value: "individual", label: "Individual" },
+                            ]}
+                            value={field.value}
+                            onValueChange={field.onChange}
+                          />
+                        )}
+                      />
+                      <TextField label="Mobile / WhatsApp" type="tel" placeholder="+919635312988" error={errors.phone?.message} {...register("phone")} />
+                      <TextField label="Email" type="email" error={errors.email?.message} {...register("email")} />
+                    </div>
+              </>
+            ),
+          },
+          {
+            id: "gst",
+            title: "GST & address",
+            summary: overseas ? "Overseas" : placeOfSupply ? stateName(placeOfSupply) : undefined,
+            invalid: Boolean(errors.treatment || errors.gstin || errors.pan || errors.country || errors.foreignTaxId || errors.placeOfSupply || errors.transin || errors.addressLine || errors.city || errors.pin),
+            content: (
+              <>
+                    <Controller
+                      control={control}
+                      name="treatment"
+                      render={({ field }) => (
+                        <div className="flex flex-col gap-1.5">
+                          <SelectField
+                            label="GST treatment"
+                            options={GST_TREATMENTS.map((option) => ({ value: option.value, label: option.label }))}
+                            value={field.value}
+                            onValueChange={field.onChange}
+                          />
+                          <p className="text-xs font-semibold text-muted">{GST_TREATMENTS.find((option) => option.value === field.value)?.hint}</p>
+                        </div>
+                      )}
+                    />
+
+                    {needsGstin(treatment) && (
+                      <div className="grid gap-x-3.5 gap-y-3 @xl:grid-cols-2 @4xl:grid-cols-3">
+                        <TextField
+                          label="GSTIN"
+                          placeholder="15 characters"
+                          maxLength={15}
+                          value={gstin}
+                          onChange={(event) => onGstinChange(event.target.value)}
+                          hint={gstinCheck?.valid ? `Valid · ${stateName(gstinStateCode(gstin))} · PAN filled in` : undefined}
+                          error={errors.gstin?.message}
+                        />
+                        <TextField label="PAN" error={errors.pan?.message} {...register("pan")} />
+                      </div>
+                    )}
+
+                    {overseas ? (
+                      <div className="grid gap-x-3.5 gap-y-3 @xl:grid-cols-2 @4xl:grid-cols-3">
+                        <TextField label="Country" placeholder="Bhutan" error={errors.country?.message} {...register("country")} />
+                        <TextField
+                          label="Their tax ID"
+                          placeholder="Bhutan TPN or equivalent"
+                          error={errors.foreignTaxId?.message}
+                          {...register("foreignTaxId")}
+                        />
+                        <Controller
+                          control={control}
+                          name="currency"
+                          render={({ field }) => (
+                            <SelectField
+                              label="Currency"
+                              options={[
+                                { value: "INR", label: "Indian rupee (INR)" },
+                                { value: "BTN", label: "Bhutanese ngultrum (BTN)" },
+                              ]}
+                              value={field.value}
+                              onValueChange={field.onChange}
+                            />
+                          )}
+                        />
+                        {isCustomer && (
+                          <Controller
+                            control={control}
+                            name="exportRoute"
+                            render={({ field }) => (
+                              <SelectField
+                                label="Export route for this buyer"
+                                options={[
+                                  { value: "lut", label: "Under LUT, no GST" },
+                                  { value: "igst", label: "IGST paid, refund later" },
+                                ]}
+                                value={field.value}
+                                onValueChange={field.onChange}
+                              />
+                            )}
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <Controller
+                        control={control}
+                        name="placeOfSupply"
+                        render={({ field }) => (
+                          <div className="flex flex-col gap-1.5">
+                            <SelectField
+                              label={needsGstin(treatment) && treatment !== "sez" ? "Place of supply · from the GSTIN" : "Place of supply"}
+                              options={stateOptions}
+                              value={field.value || undefined}
+                              onValueChange={field.onChange}
+                              disabled={needsGstin(treatment) && treatment !== "sez" && Boolean(gstinCheck?.valid)}
+                            />
+                            {errors.placeOfSupply && <p className="text-xs font-semibold text-danger-strong">{errors.placeOfSupply.message}</p>}
+                          </div>
+                        )}
+                      />
+                    )}
+
+                    {isVendor && (
+                      <Controller
+                        control={control}
+                        name="isGta"
+                        render={({ field }) => (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs font-medium text-muted">Goods transport agency</span>
+                            <FilterGroup label="Goods transport agency">
+                              <FilterChip selected={!field.value} onClick={() => field.onChange(false)}>
+                                No
+                              </FilterChip>
+                              <FilterChip selected={field.value} onClick={() => field.onChange(true)}>
+                                Yes
+                              </FilterChip>
+                            </FilterGroup>
+                            <p className="text-[11.5px] text-muted">Yes for truck transporters whose freight bills fall under reverse charge.</p>
+                          </div>
+                        )}
+                      />
+                    )}
+
+                    {isVendor && !needsGstin(treatment) && treatment !== "overseas" && (
+                      <TextField
+                        label="TRANSIN (transporter ID)"
+                        placeholder="19AAAAA0000A1Z5"
+                        hint="Only for a transporter without a GSTIN: the ID the e-way bill portal gave it."
+                        error={errors.transin?.message}
+                        {...register("transin")}
+                      />
+                    )}
+                <div className="flex flex-col gap-3.5 border-t border-line pt-3.5">
+                  <CardTitle>{overseas ? "Address" : "Main branch address"}</CardTitle>
+                      <div className="grid gap-3.5 @xl:grid-cols-[2fr_1fr_1fr]">
+                        <TextField label="Street / area" error={errors.addressLine?.message} {...register("addressLine")} />
+                        <TextField label="City / town" error={errors.city?.message} {...register("city")} />
+                        {!overseas && <TextField label="PIN code" inputMode="numeric" error={errors.pin?.message} {...register("pin")} />}
+                      </div>
+                      {!overseas && placeOfSupply && (
+                        <p className="text-xs font-semibold text-muted">State: {stateName(placeOfSupply)}, from the place of supply.</p>
+                      )}
+                </div>
+              </>
+            ),
+          },
+          {
+            id: "places",
+            title: "Branches & contacts",
+            invalid: Boolean(errors.branches || errors.contacts || errors.licences),
+            content: (
+              <>
+                {!overseas && <BranchesCard control={control} register={register} setValue={setValue} errors={errors} />}
+                <ContactsCard control={control} register={register} setValue={setValue} errors={errors} />
+                <LicencesCard control={control} register={register} setValue={setValue} errors={errors} />
+              </>
+            ),
+          },
+          {
+            id: "terms",
+            title: "Terms & balances",
+            invalid: Boolean(errors.creditDays || errors.openingBalance || errors.creditLimit || errors.udyamNumber || errors.bankName || errors.bankAccount || errors.ifsc || errors.notes),
+            content: (
+              <>
+                    <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5">
+                      <TextField
+                        label="Credit days"
+                        inputMode="numeric"
+                        hint={isVendor && !isCustomer ? "Days they give us; sets each bill's due date" : "0 for cash"}
+                        error={errors.creditDays?.message}
+                        {...register("creditDays")}
+                      />
+                      <TextField label={balanceLabel} inputMode="decimal" error={errors.openingBalance?.message} {...register("openingBalance")} />
+                      {isCustomer && isVendor && (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-muted">The opening balance is</span>
+                          <FilterGroup label="The opening balance is">
+                            <FilterChip selected={balanceSide === "receivable"} onClick={() => setValue("openingBalanceSide", "receivable", { shouldDirty: true })}>
+                              They owe us
+                            </FilterChip>
+                            <FilterChip selected={balanceSide === "payable"} onClick={() => setValue("openingBalanceSide", "payable", { shouldDirty: true })}>
+                              We owe them
+                            </FilterChip>
+                          </FilterGroup>
+                        </div>
+                      )}
+                      <TextField
+                        label="Credit limit (₹)"
+                        inputMode="decimal"
+                        hint={isCustomer && isVendor ? "Optional" : isCustomer ? "What we allow them" : "What they allow us"}
+                        error={errors.creditLimit?.message}
+                        {...register("creditLimit")}
+                      />
+                    </div>
+                    <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3.5 border-t border-line pt-4">
+                      <TextField
+                        label="Udyam (MSME) number"
+                        placeholder="UDYAM-WB-00-0000000"
+                        hint="Optional"
+                        error={errors.udyamNumber?.message}
+                        {...register("udyamNumber")}
+                      />
+                      {udyamNumber && (
+                        <>
+                          <Controller
+                            control={control}
+                            name="msmeCategory"
+                            render={({ field }) => (
+                              <SelectField
+                                label="Enterprise"
+                                options={[
+                                  { value: "micro", label: "Micro" },
+                                  { value: "small", label: "Small" },
+                                  { value: "medium", label: "Medium" },
+                                ]}
+                                value={field.value || undefined}
+                                onValueChange={field.onChange}
+                              />
+                            )}
+                          />
+                          <Controller
+                            control={control}
+                            name="msmeActivity"
+                            render={({ field }) => (
+                              <SelectField
+                                label="Registered for"
+                                options={[
+                                  { value: "manufacturing", label: "Manufacturing" },
+                                  { value: "services", label: "Services" },
+                                  { value: "trading", label: "Trading (retail / wholesale)" },
+                                ]}
+                                value={field.value || undefined}
+                                onValueChange={field.onChange}
+                              />
+                            )}
+                          />
+                        </>
+                      )}
+                    </div>
+                    {udyamNumber && <MsmeNote control={control} isVendor={isVendor} />}
+                    {isVendor && (
+                      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3.5 border-t border-line pt-4">
+                        <TextField label="Bank" error={errors.bankName?.message} {...register("bankName")} />
+                        <TextField label="Account number" inputMode="numeric" error={errors.bankAccount?.message} {...register("bankAccount")} />
+                        <TextField label="IFSC" error={errors.ifsc?.message} {...register("ifsc")} />
+                      </div>
+                    )}
+                    <TextField label="Notes" error={errors.notes?.message} {...register("notes")} />
+              </>
+            ),
+          },
+        ]}
+        actions={
+          <>
+            <Link href={ROLE_TEXT[role].path} className={buttonClasses("neutral")} tabIndex={-1}>
+              Back to {ROLE_TEXT[role].many}
+            </Link>
+            {party && onArchive && (
+              <Button variant="neutral" disabled={archiving} onClick={() => void toggleArchived()} tabIndex={-1}>
+                {party.archived ? "Restore" : "Archive"}
+              </Button>
+            )}
+            <Button type="submit" disabled={isSubmitting || (Boolean(party) && !isDirty)} data-voucher-accept="">
+              {isSubmitting ? "Saving…" : party ? "Save changes" : `Save ${ROLE_TEXT[role].one}`}
+            </Button>
+          </>
+        }
+        aside={
+          <>
+            <PartyTaxPreview company={company} roles={roles} profile={taxProfileOf({ treatment, placeOfSupply, exportRoute, isGta })} />
+            {result && <FormMessage tone={result.tone} result={result}>{result.text}</FormMessage>}
+          </>
+        }
+      />
+    </form>
+  );
+}

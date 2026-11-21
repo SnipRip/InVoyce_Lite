@@ -1,0 +1,33 @@
+// Our own company profile as the backend returns it (backend/src/company-profile).
+
+/** How we are registered under GST. Composition and unregistered charge no GST. */
+export type GstRegistrationView = "REGULAR" | "COMPOSITION" | "UNREGISTERED";
+
+export interface CompanyProfileView {
+  legalName: string;
+  tradeName: string | null;
+  registration: GstRegistrationView;
+  gstin: string | null;
+  pan: string | null;
+  /** GST state code of our registration, e.g. "19". */
+  stateCode: string;
+  iec: string | null;
+  addressLine: string | null;
+  city: string | null;
+  district: string | null;
+  pin: string | null;
+  phone: string | null;
+  altPhone: string | null;
+  email: string | null;
+  exportBank: string | null;
+  customsStation: string | null;
+  portCode: string | null;
+  defaultExportRoute: "LUT" | "IGST";
+  exportCurrency: "INR" | "BTN";
+  /** On: document lines take only their HSN's GST %; off: the HSN rate is filled in and can be changed. */
+  enforceHsnGstRate: boolean;
+  updatedAt: string;
+}
+
+/** What every tax decision needs about us: our state and how we are registered (and whether lines keep their HSN's GST %). */
+export type OurRegistration = Pick<CompanyProfileView, "stateCode" | "registration"> & Partial<Pick<CompanyProfileView, "enforceHsnGstRate">>;

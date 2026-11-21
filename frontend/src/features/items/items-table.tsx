@@ -1,0 +1,142 @@
+"use client";
+
+import clsx from "clsx";
+import { ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { Fragment } from "react";
+import { GlassTable } from "@/components/ui/glass-table";
+import { StatusChip } from "@/components/ui/status-chip";
+import { formatQuantity, formatRate } from "@/lib/format";
+import { categoryPath, resolveItemDefaults, stockStatus, type ItemCatalog } from "./item-rules";
+import { ItemThumbnail } from "./item-thumbnail";
+import { StockCell } from "./stock-cell";
+import type { Item, ItemGroup } from "./types";
+
+/** One line of the list: an item on its own, or a group with its variants. */
+export type ItemListRow = { kind: "item"; item: Item } | { kind: "group"; group: ItemGroup; variants: Item[] };
+
+interface ItemsTableProps {
+  catalog: ItemCatalog;
+  rows: ItemListRow[];
+  expandedGroups: Set<string>;
+  onToggleGroup: (groupId: string) => void;
+}
+
+const range = (given: (number | undefined)[]) => {
+  const values = given.filter((value) => value !== undefined);
+  if (values.length === 0) return "—";
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  return low === high ? formatRate(low) : `${formatRate(low)} – ${formatRate(high)}`;
+};
+
+// The item list: an item group shows as one row with a variant count and
+// opens to list its variants, each of which is an item with its own stock.
+export function ItemsTable({ catalog, rows, expandedGroups, onToggleGroup }: ItemsTableProps) {
+  if (rows.length === 0) {
+    return <p className="py-10 text-center text-sm font-semibold text-muted">No items match this search and filter.</p>;
+  }
+
+  const itemRow = (item: Item, isVariant: boolean) => {
+    const resolved = resolveItemDefaults(catalog, item);
+    return (
+      <tr key={item.id} className={clsx(isVariant && "bg-white/25")}>
+        <td className="text-left">
+          <div className={clsx("flex items-center gap-2.5", isVariant && "pl-11")}>
+            <ItemThumbnail src={item.pictures?.[0]?.url} alt="" size={36} />
+            <div className="min-w-0">
+              <Link href={`/items/${item.id}`} className="font-semibold hover:text-brand hover:underline">
+                {isVariant ? Object.values(item.attributeValues ?? {}).join(" · ") : item.name}
+              </Link>
+              <div className="text-xs text-muted">
+                {[item.sku, item.brand, isVariant ? undefined : categoryPath(catalog, item.categoryId, item.subCategoryId)]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </div>
+            </div>
+          </div>
+        </td>
+        <td className="text-left whitespace-nowrap">
+          {resolved.hsn.value ?? "—"}
+          <span className="text-muted"> · {resolved.gstRatePct.value ?? "—"}%</span>
+        </td>
+        <td>
+          <StockCell item={item} unit={resolved.unit.value} />
+        </td>
+        <td>{item.lastLandedCost === undefined ? "—" : formatRate(item.lastLandedCost)}</td>
+      </tr>
+    );
+  };
+
+  return (
+    <GlassTable className="min-w-[720px]">
+      <thead>
+        <tr className="text-right">
+          <th scope="col" className="text-left">Item</th>
+          <th scope="col" className="text-left whitespace-nowrap">HSN · GST</th>
+          <th scope="col">In stock</th>
+          <th scope="col">Last landed cost</th>
+        </tr>
+      </thead>
+      <tbody className="text-right font-semibold tabular-nums">
+        {rows.map((row) => {
+          if (row.kind === "item") return itemRow(row.item, false);
+
+          const { group, variants } = row;
+          const isOpen = expandedGroups.has(group.id);
+          const first = variants[0];
+          const resolved = resolveItemDefaults(catalog, first);
+          const lowCount = variants.filter((variant) => stockStatus(variant) !== "ok").length;
+          const totalStock = variants.reduce((sum, variant) => sum + variant.stock, 0);
+          return (
+            <Fragment key={group.id}>
+              <tr>
+                <td className="text-left">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      aria-label={`${isOpen ? "Hide" : "Show"} variants of ${group.name}`}
+                      onClick={() => onToggleGroup(group.id)}
+                      className="-ml-1.5 flex size-7 shrink-0 items-center justify-center rounded-md text-muted hover:bg-white/60 hover:text-ink"
+                    >
+                      <ChevronRight aria-hidden="true" className={clsx("size-4 transition-transform", isOpen && "rotate-90")} />
+                    </button>
+                    <ItemThumbnail src={variants.find((variant) => variant.pictures?.length)?.pictures?.[0]?.url} alt="" size={36} className="mr-1" />
+                    <div className="min-w-0">
+                      <Link href={`/items/groups/${group.id}`} className="font-semibold hover:text-brand hover:underline">
+                        {group.name}
+                      </Link>
+                      <div className="text-xs text-muted">
+                        {[
+                          `Item group · ${variants.length} ${variants.length === 1 ? "variant" : "variants"}`,
+                          group.brand,
+                          categoryPath(catalog, group.categoryId, group.subCategoryId),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td className="text-left whitespace-nowrap">
+                  {resolved.hsn.value ?? "—"}
+                  <span className="text-muted"> · {resolved.gstRatePct.value ?? "—"}%</span>
+                </td>
+                <td>
+                  {lowCount > 0 ? (
+                    <StatusChip tone="warning">{lowCount} low or out</StatusChip>
+                  ) : (
+                    `${formatQuantity(totalStock)} ${resolved.unit.value ?? ""}`
+                  )}
+                </td>
+                <td>{range(variants.map((variant) => variant.lastLandedCost))}</td>
+              </tr>
+              {isOpen && variants.map((variant) => itemRow(variant, true))}
+            </Fragment>
+          );
+        })}
+      </tbody>
+    </GlassTable>
+  );
+}

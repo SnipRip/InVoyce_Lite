@@ -1,0 +1,200 @@
+// Receipts and payments on the backend: paths, labels, save calls, and the
+// rules the screens share (apply oldest first, MSME days left, a party's
+// statement, refunds of advances). The backend checks everything again on save.
+import type { CreditNoteView, DebitNoteView } from "@/types/note";
+import { apiRequest } from "@/lib/api-client";
+import { daysBetween } from "@/lib/dates";
+import type { AgeBucketView, OpenDocumentView, PaymentModeView, SettlementDirectionView, SettlementTargetView, SettlementView } from "@/types/settlement";
+
+export const SETTLEMENTS_PATH = "/settlements";
+export const documentsPath = (direction: SettlementDirectionView, partyId?: string) =>
+  `${SETTLEMENTS_PATH}/documents?direction=${direction}${partyId ? `&partyId=${partyId}` : ""}`;
+export const numberPreviewPath = (direction: SettlementDirectionView, date: string) => `/number-series/preview?kind=${direction}&date=${date}`;
+
+export const MODE_OPTIONS: { value: PaymentModeView; label: string }[] = [
+  { value: "BANK_TRANSFER", label: "Bank transfer (NEFT / RTGS)" },
+  { value: "CHEQUE", label: "Cheque" },
+  { value: "UPI", label: "UPI" },
+  { value: "CASH", label: "Cash" },
+];
+export const modeText = (mode: PaymentModeView) => MODE_OPTIONS.find((option) => option.value === mode)?.label ?? mode;
+
+export const AGE_TEXT: Record<AgeBucketView, string> = {
+  NOT_DUE: "Not due",
+  DAYS_1_30: "1–30 days",
+  DAYS_31_60: "31–60 days",
+  DAYS_61_90: "61–90 days",
+  OVER_90: "Over 90 days",
+};
+export const AGE_ORDER = Object.keys(AGE_TEXT) as AgeBucketView[];
+
+/** Cash of ₹2 lakh or more from one person in a day is barred (Income-tax Act s.269ST). */
+export const CASH_RECEIPT_LIMIT = 200000;
+
+const money = (value: number) => Math.round(value * 100) / 100;
+
+/** Where an invoice, bill, expense, opening balance or refunded advance opens in the app. */
+export const documentHref = (document: Pick<OpenDocumentView, "kind" | "id" | "partyId"> & { journalId?: string }) =>
+  document.kind === "JOURNAL"
+    ? `/journals/${document.journalId ?? ""}`
+    : document.kind === "ADVANCE"
+    ? `/payments/entries/${document.id}`
+    : document.kind === "CREDIT_NOTE"
+    ? `/credit-notes/${document.id}`
+    : document.kind === "DEBIT_NOTE"
+    ? `/debit-notes/${document.id}`
+    : document.kind === "INVOICE"
+    ? `/invoices/${document.id}`
+    : document.kind === "BILL"
+      ? `/purchases/${document.id}`
+      : document.kind === "EXPENSE"
+        ? `/expenses/${document.id}`
+        : `/payments/ledger/${document.partyId}`;
+
+/** Days left before an MSME bill passes its 45-day limit (negative once late). */
+export const msmeDaysLeft = (document: Pick<OpenDocumentView, "dueDate">, today: string) => (document.dueDate ? daysBetween(today, document.dueDate) : 0);
+
+/** Pick documents oldest first (the opening balance before any) until the amount runs out, the usual auto-apply. */
+export function applyOldestFirst(amount: number, open: OpenDocumentView[]) {
+  let left = money(amount);
+  const plan = new Map<string, number>();
+  for (const document of [...open].sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""))) {
+    const applied = money(Math.min(left, document.balance));
+    if (applied > 0) plan.set(document.id, applied);
+    left = money(left - applied);
+  }
+  return plan;
+}
+
+export interface StatementRow {
+  date: string;
+  description: string;
+  href?: string;
+  /** Raises what the party owes us (invoice) or what we owe them (bill). */
+  charge: number;
+  /** Money (and TDS) that settles it. */
+  settle: number;
+  balance: number;
+}
+
+const entryText = (settlement: SettlementView) =>
+  `${settlement.number}${settlement.refund ? (settlement.allocations.some((allocation) => allocation.kind === "ADVANCE") ? " · refund of advance" : " · refund of note credit") : ""} · ${modeText(settlement.mode)}${settlement.reference ? ` ${settlement.reference}` : ""}${settlement.tds ? ` (TDS ${settlement.tds.toFixed(2)})` : ""}`;
+
+/**
+ * A party's statement in one direction: opening balance, documents and live
+ * settlements by date, with a running balance. `refunds` are entries of the
+ * other direction that gave an advance back (a payment to the customer, a
+ * receipt from the vendor): they raise the balance as a document does.
+ */
+export function statementRows(
+  opening: number,
+  documents: OpenDocumentView[],
+  settlements: SettlementView[],
+  refunds: SettlementView[] = [],
+  /** Live credit notes (customer side) or debit notes (vendor side): they settle like money. */
+  notes: { id: string; number: string; date: string; total: number; href: string }[] = [],
+): StatementRow[] {
+  const entries = [
+    ...notes.map((note) => ({ date: note.date, rank: 1, description: note.number, href: note.href, charge: 0, settle: note.total })),
+    ...refunds
+      .filter((refund) => !refund.cancelledAt)
+      .map((refund) => ({ date: refund.date, rank: 2, description: entryText(refund), href: `/payments/entries/${refund.id}`, charge: refund.amount, settle: 0 })),
+    ...documents
+      .filter((document) => document.kind !== "OPENING" && document.date)
+      .map((document) => ({ date: document.date!, rank: 0, description: document.number, href: documentHref(document), charge: document.total, settle: 0 })),
+    ...settlements
+      .filter((settlement) => !settlement.cancelledAt)
+      .map((settlement) => ({
+        date: settlement.date,
+        rank: 1,
+        description: entryText(settlement),
+        href: `/payments/entries/${settlement.id}`,
+        charge: 0,
+        settle: money(settlement.amount + settlement.tds),
+      })),
+  ].sort((a, b) => a.date.localeCompare(b.date) || a.rank - b.rank);
+  // On one day: documents, then the money that settles them, then refunds of what that money left over.
+  let balance = opening;
+  return entries.map((entry) => {
+    balance = money(balance + entry.charge - entry.settle);
+    return { ...entry, balance };
+  });
+}
+
+export interface AllocationBody {
+  kind: SettlementTargetView;
+  documentId: string;
+  amount: number;
+}
+
+export interface SettlementBody {
+  direction: SettlementDirectionView;
+  partyId: string;
+  date: string;
+  accountId: string;
+  mode: PaymentModeView;
+  amount: number;
+  tds: number;
+  reference: string | null;
+  brcNumber: string | null;
+  brcDate: string | null;
+  notes: string | null;
+  allocations: AllocationBody[];
+}
+
+/** The direction of the entry that refunds an advance kept by a receipt (a payment) or a payment (a receipt). */
+export const REFUND_DIRECTION: Record<SettlementDirectionView, SettlementDirectionView> = { RECEIPT: "PAYMENT", PAYMENT: "RECEIPT" };
+
+export const refundPath = (advanceId: string) => `/payments/refunds/new?advance=${advanceId}`;
+
+/** Live receipts (or payments) still holding an advance, a party's or everyone's, oldest first. */
+export const openAdvances = (settlements: SettlementView[], kept: SettlementDirectionView, partyId?: string) =>
+  settlements
+    .filter((settlement) => settlement.direction === kept && !settlement.refund && !settlement.cancelledAt && settlement.unapplied > 0 && (!partyId || settlement.partyId === partyId))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
+
+/** An advance as a row the allocation table and "oldest first" understand (balance = what is left to refund). */
+export const advanceDocument = (settlement: SettlementView): OpenDocumentView => ({
+  kind: "ADVANCE",
+  id: settlement.id,
+  number: settlement.number,
+  date: settlement.date,
+  dueDate: null,
+  partyId: settlement.partyId,
+  partyName: settlement.partyName,
+  total: money(settlement.amount + settlement.tds),
+  settled: money(settlement.applied + settlement.refunded),
+  balance: settlement.unapplied,
+  ageBucket: "NOT_DUE",
+  flag: null,
+});
+
+/**
+ * A note still holding the party's credit, as a row the refund table
+ * understands: a credit note's credit is paid back to the customer, a debit
+ * note's received back from the vendor (balance = what is left to refund).
+ */
+export const noteCreditDocument = (note: CreditNoteView | DebitNoteView): OpenDocumentView => ({
+  kind: "invoiceNumber" in note ? "CREDIT_NOTE" : "DEBIT_NOTE",
+  id: note.id,
+  number: note.number,
+  date: note.date,
+  dueDate: null,
+  partyId: note.partyId,
+  partyName: note.partyName,
+  total: note.partyAmount,
+  settled: money(note.partyAmount - note.creditLeft),
+  balance: note.creditLeft,
+  ageBucket: "NOT_DUE",
+  flag: null,
+});
+
+/** Live notes still holding credit, oldest first. */
+export const openNoteCredits = (notes: (CreditNoteView | DebitNoteView)[]) =>
+  notes.filter((note) => !note.cancelledAt && note.creditLeft > 0).sort((a, b) => a.date.localeCompare(b.date)).map(noteCreditDocument);
+
+export const createSettlement = (body: SettlementBody) => apiRequest<SettlementView>(SETTLEMENTS_PATH, { method: "POST", body });
+export const applyAdvance = (id: string, allocations: AllocationBody[]) =>
+  apiRequest<SettlementView>(`${SETTLEMENTS_PATH}/${id}/allocations`, { method: "POST", body: { allocations } });
+export const cancelSettlement = (id: string, reason: string) =>
+  apiRequest<SettlementView>(`${SETTLEMENTS_PATH}/${id}/cancel`, { method: "POST", body: { reason } });

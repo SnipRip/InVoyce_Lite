@@ -1,0 +1,122 @@
+"use client";
+
+import Link from "next/link";
+import { GlassTable } from "@/components/ui/glass-table";
+import { StatusChip } from "@/components/ui/status-chip";
+import { formatQuantity, formatRate } from "@/lib/format";
+import type { VariantRow } from "./item-group-schema";
+import type { Item } from "./types";
+
+export interface VariantLine {
+  key: string;
+  values: Record<string, string>;
+  name: string;
+  row: VariantRow;
+  /** The item this variant already is, when editing a saved group. */
+  existing?: Item;
+  /** `existing` is a standalone item joining the group on save. */
+  adopting?: boolean;
+  /** The existing item's own base unit, when it differs from the group's. */
+  unit?: string;
+  errors?: Partial<Record<keyof VariantRow, string>>;
+}
+
+interface VariantRowsTableProps {
+  lines: VariantLine[];
+  unit: string;
+  onChange: (key: string, field: keyof VariantRow, value: string) => void;
+}
+
+const cellInput =
+  "glass-field h-10 w-full min-w-0 px-3 text-right text-[13px] font-semibold tabular-nums aria-[invalid=true]:border-danger";
+
+// The variants an item group generates, one row each, with the fields that
+// differ between variants. Each row becomes an item on save.
+export function VariantRowsTable({ lines, unit, onChange }: VariantRowsTableProps) {
+  if (lines.length === 0) {
+    return (
+      <p className="glass-inset rounded-(--radius-tile) px-4 py-6 text-center text-[13px] text-muted">
+        Add an attribute and its options above. A variant is made for every combination.
+      </p>
+    );
+  }
+
+  const input = (line: VariantLine, field: keyof VariantRow, label: string, align: "left" | "right" = "right") => (
+    <input
+      aria-label={`${label}, ${line.name}`}
+      inputMode={field === "sku" ? "text" : "decimal"}
+      value={line.row[field]}
+      onChange={(event) => onChange(line.key, field, event.target.value)}
+      aria-invalid={line.errors?.[field] ? true : undefined}
+      className={align === "left" ? `${cellInput} text-left` : cellInput}
+    />
+  );
+
+  return (
+    <GlassTable className="min-w-[860px]">
+      <thead>
+        <tr className="text-right">
+          <th scope="col" className="text-left">Variant</th>
+          <th scope="col" className="w-[170px] text-left">SKU</th>
+          <th scope="col" className="w-[130px]">Opening stock</th>
+          <th scope="col" className="w-[130px]">Opening rate (₹)</th>
+          <th scope="col" className="w-[120px]">Reorder at</th>
+        </tr>
+      </thead>
+      <tbody className="font-semibold tabular-nums">
+        {lines.map((line) => {
+          const firstError = Object.values(line.errors ?? {})[0];
+          return (
+            <tr key={line.key} className="align-top">
+              <td className="text-left">
+                <div className="flex flex-wrap items-center gap-1.5 pt-2">
+                  {line.existing ? (
+                    <Link href={`/items/${line.existing.id}`} className="font-semibold hover:text-brand hover:underline">
+                      {Object.values(line.values).join(" · ")}
+                    </Link>
+                  ) : (
+                    <span className="font-semibold">{Object.values(line.values).join(" · ")}</span>
+                  )}
+                  {!line.existing && <StatusChip tone="brand">New</StatusChip>}
+                  {line.adopting && <StatusChip tone="brand">Joining</StatusChip>}
+                </div>
+                <div className="text-xs text-muted">{line.adopting ? `${line.existing?.name} · keeps its name, stock and history` : line.name}</div>
+                {firstError && <div className="text-xs font-semibold text-danger-strong">{firstError}</div>}
+              </td>
+              <td>
+                {line.adopting ? <div className="pt-2.5 text-left text-[13px]">{line.existing?.sku ?? "No SKU"}</div> : input(line, "sku", "SKU", "left")}
+              </td>
+              <td className="text-right">
+                {line.existing ? (
+                  <div className="pt-2.5 text-[13px]">
+                    {formatQuantity(line.existing.stock)} {line.unit ?? unit}
+                    <div className="text-[11px] text-muted">in stock</div>
+                  </div>
+                ) : (
+                  input(line, "openingStock", "Opening stock")
+                )}
+              </td>
+              <td className="text-right">
+                {line.existing ? (
+                  <div className="pt-2.5 text-[13px]">
+                    {line.existing.lastLandedCost === undefined ? "–" : formatRate(line.existing.lastLandedCost)}
+                    <div className="text-[11px] text-muted">last landed</div>
+                  </div>
+                ) : (
+                  input(line, "openingRate", "Opening rate")
+                )}
+              </td>
+              <td>
+                {line.adopting ? (
+                  <div className="pt-2.5 text-[13px]">{formatQuantity(line.existing?.reorderLevel ?? 0)}</div>
+                ) : (
+                  input(line, "reorderLevel", "Reorder level")
+                )}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </GlassTable>
+  );
+}

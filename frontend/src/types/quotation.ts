@@ -1,0 +1,65 @@
+// Quotations as the backend returns them (backend/src/quotations).
+import type { EnteredLineView } from "./entered-line";
+import type { DocumentBranch } from "./party";
+import type { AppliedSchemeView } from "./scheme";
+
+export type QuotationStatusView = "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED" | "CANCELLED" | "CONVERTED";
+export type LineRateSourceView = "SPECIAL" | "SHEET" | "LAST_QUOTED" | "LAST_SOLD" | "MANUAL";
+export type SaleRegimeView = "INTRA_STATE" | "INTER_STATE" | "EXPORT_LUT" | "EXPORT_IGST" | "BILL_OF_SUPPLY";
+
+export interface QuotationLineView {
+  id: string;
+  itemId: string;
+  description: string;
+  hsn: string;
+  unit: string;
+  quantity: number;
+  rate: number;
+  /** As entered and printed; quantity and rate above are per base unit. */
+  entered: EnteredLineView;
+  discountPct: number;
+  rateSource: LineRateSourceView;
+  suggestedRate: number | null;
+  schemeDiscount: number;
+  freeQuantity: number;
+  schemes: AppliedSchemeView[];
+  gstRatePct: number;
+  taxable: number;
+  tax: number;
+  /** Last landed cost per unit when saved; null before any stock. */
+  costAtQuote: number | null;
+}
+
+export interface QuotationView {
+  id: string;
+  number: string;
+  revision: number;
+  date: string;
+  validUntil: string;
+  partyId: string;
+  partyName: string;
+  /** Null: the customer's main branch. */
+  billTo: DocumentBranch | null;
+  status: QuotationStatusView;
+  regime: SaleRegimeView;
+  /** False: entered without GST (every line at 0%). */
+  gstApplicable: boolean;
+  terms: string | null;
+  notes: string | null;
+  totals: {
+    gross: number;
+    schemeDiscount: number;
+    taxable: number;
+    cgst: number;
+    sgst: number;
+    igst: number;
+    tax: number;
+    roundOff: number;
+    total: number;
+    cost: number;
+  };
+  lines: QuotationLineView[];
+  history: { revision: number; date: string; total: number; note: string }[];
+  /** The live invoice it was converted to. */
+  invoice: { id: string; number: string } | null;
+}
