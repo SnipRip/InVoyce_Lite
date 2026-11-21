@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { headProblem, HEAD_GROUPS, isExpense, settleHead, type HeadFacts } from './account-head-rules.js';
 
-const freight: HeadFacts = { nature: 'DIRECT_EXPENSE', gst: 'OWN_RATE', gstRatePct: 5, allocation: 'SHIPMENT' };
+const freight: HeadFacts = { nature: 'DIRECT_EXPENSE', gst: 'OWN_RATE', gstRatePct: 5, allocation: 'INVOICE' };
 const rent: HeadFacts = { nature: 'INDIRECT_EXPENSE', gst: 'OWN_RATE', gstRatePct: 18, allocation: 'OVERHEAD' };
 const interest: HeadFacts = { nature: 'INDIRECT_INCOME', gst: null, gstRatePct: null, allocation: null };
 

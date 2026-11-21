@@ -52,7 +52,6 @@ export function AllocationTable<T extends AllocationRowsForm>({ documents, rowId
               </Link>
               <div className="text-xs text-muted">
                 {document.date ? formatDayMonth(document.date) : "Brought forward"}
-                {document.flag === "EXPORT" && " · export"}
                 {document.flag === "MSME" && document.dueDate && today && ` · MSME, ${Math.max(msmeDaysLeft(document, today), 0)} days left`}
               </div>
             </td>

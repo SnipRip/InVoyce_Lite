@@ -4,7 +4,7 @@ import { FilterGroup } from "@/components/ui/filter-group";
 interface GstApplicableToggleProps {
   value: boolean;
   onChange: (applicable: boolean) => void;
-  /** Why it cannot be changed (we charge no GST, or an export goes under LUT). */
+  /** Why it cannot be changed (we charge no GST). */
   lockedReason?: string;
 }
 

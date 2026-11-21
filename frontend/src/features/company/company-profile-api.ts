@@ -10,13 +10,10 @@ export const toCompanyValues = (view: CompanyProfileView): CompanyProfileValues 
   legalName: view.legalName,
   registration: view.registration,
   stateCode: view.stateCode,
-  defaultExportRoute: view.defaultExportRoute,
-  exportCurrency: view.exportCurrency,
   enforceHsnGstRate: view.enforceHsnGstRate,
   tradeName: view.tradeName ?? "",
   gstin: view.gstin ?? "",
   pan: view.pan ?? "",
-  iec: view.iec ?? "",
   addressLine: view.addressLine ?? "",
   city: view.city ?? "",
   district: view.district ?? "",
@@ -24,9 +21,6 @@ export const toCompanyValues = (view: CompanyProfileView): CompanyProfileValues 
   phone: view.phone ?? "",
   altPhone: view.altPhone ?? "",
   email: view.email ?? "",
-  exportBank: view.exportBank ?? "",
-  customsStation: view.customsStation ?? "",
-  portCode: view.portCode ?? "",
 });
 
 export const saveCompanyProfile = (values: CompanyProfileValues) =>

@@ -44,10 +44,10 @@ export const IsHsn = (pattern = HSN_PATTERN) =>
     }),
   );
 
-/** A phone number with its country code: +919635312988. */
+/** A phone number with its country code: +919876543210. */
 export const IsPhone = () =>
   Matches(/^\+[1-9]\d{7,14}$/, {
-    message: 'Phone must include the country code, for example +919635312988',
+    message: 'Phone must include the country code, for example +919876543210',
   });
 
 /** `?includeArchived=true` on list routes. */

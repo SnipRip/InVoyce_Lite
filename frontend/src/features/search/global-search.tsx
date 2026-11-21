@@ -19,8 +19,8 @@ const MIN_LENGTH = 2;
 const searchPath = (query: string) => `/search?q=${encodeURIComponent(query)}`;
 
 // The top bar's search (SOW 17) on the server (GET /search): items, parties,
-// quotations, invoices and their document numbers (IRN, e-way bill, Shipping
-// Bill, LEO …), bills, shipments, transfers, receipts and payments, expenses,
+// quotations, invoices and their document numbers (IRN, e-way bill, lorry
+// challan), bills, transfers, receipts and payments, expenses,
 // vehicles; only what the user's role may open. Arrow keys move, Enter
 // opens, Escape closes, Ctrl+K (⌘K) jumps here from anywhere.
 export function GlobalSearch() {
@@ -92,7 +92,7 @@ export function GlobalSearch() {
               setOpen(false);
             }
           }}
-          placeholder="Search products, invoices, Shipping Bill / LEO no., vehicles"
+          placeholder="Search products, invoices, e-way bill no., vehicles"
           className="h-full min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted"
         />
         <kbd className="hidden rounded bg-ink/7 px-1.5 py-px text-[11px] font-medium text-muted lg:inline">Ctrl K</kbd>

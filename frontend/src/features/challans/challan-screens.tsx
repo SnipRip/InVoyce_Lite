@@ -71,7 +71,6 @@ export function ChallanScreen({ challanId }: { challanId: string }) {
       challan={challan}
       party={party ? toParty(party) : undefined}
       issuer={issuerOf(profile)}
-      overseas={party?.treatment === "OVERSEAS" || party?.treatment === "SEZ"}
       onChanged={async () => {
         await mutate();
       }}

@@ -19,13 +19,12 @@ import { dueFor, matchesPartySearch, placeOf, ROLE_TEXT, taxFor } from "./party-
 import type { Party, PartyRole } from "./types";
 import type { OurRegistration } from "@/types/company";
 
-type TreatmentFilter = "all" | "with-gstin" | "without-gstin" | "overseas" | "archived";
+type TreatmentFilter = "all" | "with-gstin" | "without-gstin" | "archived";
 
 const FILTERS: { value: TreatmentFilter; label: string; treatments?: GstTreatment[] }[] = [
   { value: "all", label: "All" },
-  { value: "with-gstin", label: "With GSTIN", treatments: ["registered", "composition", "sez"] },
+  { value: "with-gstin", label: "With GSTIN", treatments: ["registered", "composition"] },
   { value: "without-gstin", label: "Without GSTIN", treatments: ["unregistered", "consumer"] },
-  { value: "overseas", label: "Outside India", treatments: ["overseas"] },
   { value: "archived", label: "Archived" },
 ];
 
@@ -54,7 +53,6 @@ export function PartiesWorkspace({ role, parties, company, balances }: PartiesWo
 
   const outstanding = mine.reduce((sum, party) => sum + due(party), 0);
   const noCredit = mine.filter((party) => taxFor(role, company, party).itc === false).length;
-  const overseas = mine.filter((party) => party.treatment === "overseas").length;
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -62,7 +60,7 @@ export function PartiesWorkspace({ role, parties, company, balances }: PartiesWo
         <StatTile label={role === "customer" ? "Customers" : "Vendors"} value={formatQuantity(mine.length)} />
         <StatTile label={dueLabel.charAt(0).toUpperCase() + dueLabel.slice(1)} value={formatInr(outstanding)} />
         {role === "customer" ? (
-          <StatTile label="Bhutan and overseas" value={formatQuantity(overseas)} />
+          <StatTile label="Without GSTIN" value={formatQuantity(mine.filter((party) => !party.gstin).length)} />
         ) : (
           <StatTile label="No GST bill" value={formatQuantity(noCredit)} />
         )}
@@ -129,7 +127,7 @@ export function PartiesWorkspace({ role, parties, company, balances }: PartiesWo
                   </td>
                   <td className="text-left">
                     <div>{treatmentLabel(party.treatment)}</div>
-                    <div className="text-xs text-muted">{party.gstin ?? party.foreignTaxId ?? "No GSTIN"}</div>
+                    <div className="text-xs text-muted">{party.gstin ?? "No GSTIN"}</div>
                   </td>
                   <td className="text-left">{placeOf(party)}</td>
                   <td className="text-left">

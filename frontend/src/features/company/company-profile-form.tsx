@@ -27,8 +27,8 @@ const stateOptions = INDIAN_STATES.map((state) => ({ value: state.code, label: `
 const fieldGrid = "grid gap-x-3.5 gap-y-3 @xl:grid-cols-2 @4xl:grid-cols-3";
 const sectionTitle = "text-xs font-semibold tracking-wide text-muted uppercase";
 
-// Our own registration, address and export identifiers: what every
-// quotation, invoice and shipping bill prints about us. Our registration
+// Our own registration and address: what every quotation and invoice
+// prints about us. Our registration
 // decides whether documents charge GST at all; our state, CGST + SGST or IGST.
 export function CompanyProfileForm({ initial, onSave }: CompanyProfileFormProps) {
   const [result, setResult] = useState<{ tone: "success" | "error"; text: string } | null>(null);
@@ -115,7 +115,7 @@ export function CompanyProfileForm({ initial, onSave }: CompanyProfileFormProps)
             {!unregistered && (
               <TextField
                 label="Our GSTIN"
-                placeholder="Still to come from the client"
+                placeholder="15 characters"
                 error={errors.gstin?.message}
                 {...register("gstin")}
                 onChange={(event) => onGstinChange(event.target.value)}
@@ -157,57 +157,10 @@ export function CompanyProfileForm({ initial, onSave }: CompanyProfileFormProps)
             <TextField label="City / town" error={errors.city?.message} {...register("city")} />
             <TextField label="District" error={errors.district?.message} {...register("district")} />
             <TextField label="PIN code" inputMode="numeric" error={errors.pin?.message} {...register("pin")} />
-            <TextField label="Phone" type="tel" placeholder="+919635312988" error={errors.phone?.message} {...register("phone")} />
-            <TextField label="Second phone" type="tel" placeholder="+97577667493" error={errors.altPhone?.message} {...register("altPhone")} />
+            <TextField label="Phone" type="tel" placeholder="+919876543210" error={errors.phone?.message} {...register("phone")} />
+            <TextField label="Second phone" type="tel" placeholder="+919876500000" error={errors.altPhone?.message} {...register("altPhone")} />
             <TextField label="Email" type="email" error={errors.email?.message} {...register("email")} />
           </div>
-        </section>
-
-        <section className="flex flex-col gap-3">
-          <h3 className={sectionTitle}>Export</h3>
-          <div className={fieldGrid}>
-            <TextField label="IEC (Importer-Exporter Code)" placeholder="10 characters, from DGFT" error={errors.iec?.message} {...register("iec")} />
-            <TextField label="Export payments bank" placeholder="Bank that receives export payments" error={errors.exportBank?.message} {...register("exportBank")} />
-            <TextField label="Customs station" error={errors.customsStation?.message} {...register("customsStation")} />
-            <TextField
-              label="Default port code"
-              placeholder="INJIGB"
-              hint="The 6-character customs port code, e.g. INJIGB. Each shipping bill can use another port."
-              error={errors.portCode?.message}
-              {...register("portCode")}
-            />
-            <Controller
-              control={control}
-              name="defaultExportRoute"
-              render={({ field }) => (
-                <SelectField
-                  label="Default export route"
-                  options={[
-                    { value: "LUT", label: "Under LUT, no GST" },
-                    { value: "IGST", label: "IGST paid, refund later" },
-                  ]}
-                  value={field.value}
-                  onValueChange={field.onChange}
-                />
-              )}
-            />
-            <Controller
-              control={control}
-              name="exportCurrency"
-              render={({ field }) => (
-                <SelectField
-                  label="Export invoice currency"
-                  options={[
-                    { value: "INR", label: "Indian rupee (INR)" },
-                    { value: "BTN", label: "Bhutanese ngultrum (BTN)" },
-                  ]}
-                  value={field.value}
-                  onValueChange={field.onChange}
-                />
-              )}
-            />
-          </div>
-          <p className="text-xs font-medium text-muted">The AD code is issued every year, so it sits beside that year&apos;s LUT.</p>
         </section>
 
         {result && <FormMessage tone={result.tone} result={result}>{result.text}</FormMessage>}

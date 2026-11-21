@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { dateOnly, isoDate, todayInIndia } from '../common/dates.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { DispatchDocumentKind, GstTreatment, InvoiceKind, InvoiceStatus, Prisma } from '../generated/prisma/client.js';
+import type { DispatchDocumentKind, GstTreatment, InvoiceStatus, Prisma } from '../generated/prisma/client.js';
 import { cleanDetails, cleanNumber, documentDateProblem, documentKindProblem, nameInText } from './dispatch-document-rules.js';
 import type { InvoiceDocumentDto } from './dto/invoice.dto.js';
 import { invoiceInclude, toInvoiceView, type InvoiceView } from './invoice-views.js';
@@ -12,7 +12,7 @@ type Tx = Prisma.TransactionClient;
 const ONE_INVOICE_KINDS: DispatchDocumentKind[] = ['E_INVOICE', 'EWAY_BILL'];
 
 // The papers that follow an issued invoice (IRN, lorry hire challan, e-way
-// bill, customs invoice, packing list, shipping bill, LEO, BRC). One per kind
+// bill). One per kind
 // per invoice; saving again corrects it. Only while the invoice is issued: a
 // cancelled invoice keeps its papers, read-only. The invoice row is locked so
 // a cancel and an attach cannot cross.
@@ -23,7 +23,7 @@ export class InvoiceDocumentsService {
   save(invoiceId: string, kind: DispatchDocumentKind, dto: InvoiceDocumentDto, userId: string): Promise<InvoiceView> {
     return this.prisma.$transaction(async (tx) => {
       const invoice = await this.lockIssued(tx, invoiceId);
-      const kindProblem = documentKindProblem(kind, invoice.kind, invoice.treatment);
+      const kindProblem = documentKindProblem(kind, invoice.treatment);
       if (kindProblem) throw new BadRequestException(kindProblem);
 
       const number = cleanNumber(kind, dto.number);
@@ -61,8 +61,8 @@ export class InvoiceDocumentsService {
   }
 
   private async lockIssued(tx: Tx, invoiceId: string) {
-    const [invoice] = await tx.$queryRaw<{ kind: InvoiceKind; status: InvoiceStatus; date: Date; treatment: GstTreatment }[]>`
-      SELECT i."kind", i."status", i."date", p."treatment"
+    const [invoice] = await tx.$queryRaw<{ status: InvoiceStatus; date: Date; treatment: GstTreatment }[]>`
+      SELECT i."status", i."date", p."treatment"
       FROM "Invoice" i JOIN "Party" p ON p."id" = i."partyId"
       WHERE i."id" = ${invoiceId}::uuid FOR UPDATE OF i`;
     if (!invoice) throw new NotFoundException('That invoice does not exist');

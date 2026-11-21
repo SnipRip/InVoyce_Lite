@@ -32,12 +32,11 @@ export function headProblem(head: ExpenseHeadFacts | null): string | null {
 
 /**
  * A vendor's tax treatment that an expense cannot carry: a goods transport
- * agency bills freight under reverse charge, and an import goes through
- * customs; both are entered as a freight bill in Purchases.
+ * agency bills freight under reverse charge, entered as a freight bill in
+ * Purchases.
  */
 export function vendorTaxProblem(tax: BillTax): string | null {
   if (tax.regime === 'REVERSE_CHARGE') return 'A goods transport agency bills under reverse charge: enter it as a freight bill in Purchases';
-  if (tax.regime === 'IMPORT') return 'A bill from an overseas or SEZ vendor goes through Purchases';
   return null;
 }
 
@@ -80,16 +79,14 @@ export function expenseFigures(amount: number, tax: BillTax, head: Pick<ExpenseH
 /**
  * Where the cost may land: an indirect expense is always overhead; only a
  * head that lands on item cost may go on a purchase's items; a purchase or
- * an invoice must be named for those, and nothing for a shipment (linked
- * once shipments are stored) or overhead.
+ * an invoice must be named for those, and nothing for overhead.
  */
 export function allocationProblem(head: Pick<ExpenseHeadFacts, 'nature' | 'allocation' | 'name'>, allocation: HeadAllocation, targetId: string | null): string | null {
   if (head.nature === 'INDIRECT_EXPENSE' && allocation !== 'OVERHEAD') return `${head.name} is an indirect expense: it is a general overhead`;
   if (allocation === 'ITEM_COST' && head.allocation !== 'ITEM_COST') return `${head.name} does not land on item cost (freight inward, unloading, labour do)`;
   if (allocation === 'ITEM_COST' && !targetId) return 'Pick the purchase whose items carry this cost';
   if (allocation === 'INVOICE' && !targetId) return 'Pick the invoice this cost belongs to';
-  // A shipment expense may name its shipment now or be linked from the shipment later.
-  if (allocation === 'OVERHEAD' && targetId) return 'An overhead names no purchase, invoice or shipment';
+  if (allocation === 'OVERHEAD' && targetId) return 'An overhead names no purchase or invoice';
   return null;
 }
 

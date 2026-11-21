@@ -17,7 +17,6 @@ export function NoteDocument({ kind, note, party, issuer }: { kind: NoteKind; no
   const debit = "billReference" in note ? note : null;
   const goods = note.reason === "GOODS_RETURNED";
   const withGst = note.gstAdjusted;
-  const lut = credit?.regime === "EXPORT_LUT";
   const taxRows = [
     ...(note.cgst ? [{ name: "CGST", amount: note.cgst }] : []),
     ...(note.sgst ? [{ name: "SGST", amount: note.sgst }] : []),
@@ -87,7 +86,7 @@ export function NoteDocument({ kind, note, party, issuer }: { kind: NoteKind; no
                   </td>
                 )}
                 <td className="py-1.5">{formatRate(line.taxable)}</td>
-                {withGst && <td className="py-1.5">{lut ? "0% (LUT)" : `${line.gstRatePct}%`}</td>}
+                {withGst && <td className="py-1.5">{`${line.gstRatePct}%`}</td>}
                 {withGst && <td className="py-1.5">{formatRate(line.tax)}</td>}
                 <td className="py-1.5 font-semibold">{formatRate(line.taxable + (withGst ? line.tax : 0))}</td>
               </tr>
@@ -131,13 +130,6 @@ export function NoteDocument({ kind, note, party, issuer }: { kind: NoteKind; no
             <dt>Total</dt>
             <dd>{formatRate(note.total)}</dd>
           </div>
-          {/* An export with IGST paid: the customer paid the goods value only, so only that is credited to them. */}
-          {note.partyAmount !== note.total && (
-            <div className="flex justify-between font-semibold">
-              <dt>Credited to you</dt>
-              <dd>{formatRate(note.partyAmount)}</dd>
-            </div>
-          )}
         </dl>
       </section>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { billedAs } from "@/features/parties/party-branches";
-import { Globe, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { buttonClasses } from "@/components/ui/button";
@@ -16,10 +16,9 @@ import { StatusChip } from "@/components/ui/status-chip";
 import { stateName } from "@/features/gst/indian-states";
 import type { Party } from "@/features/parties/types";
 import { formatDayMonth, formatInr, formatQuantity } from "@/lib/format";
-import { documentsFor } from "./dispatch-documents";
 import { invoiceStage, invoiceTax, invoiceTotals, missingDocuments, needsEinvoice } from "./invoice-rules";
 import { InvoiceStageChip } from "./invoice-stage-chip";
-import type { Invoice, InvoiceKind } from "./types";
+import type { Invoice } from "./types";
 import { registrationOn } from "@/features/gst/gst-rules";
 import type { OurRegistration } from "@/types/company";
 
@@ -29,10 +28,9 @@ interface InvoicesWorkspaceProps {
   company: OurRegistration;
 }
 
-// All sales invoices, local and export, with what each still needs: an
-// export is done only when its customs papers and BRC are attached.
+// All sales invoices, with the transport papers each still needs.
 export function InvoicesWorkspace({ invoices, parties, company }: InvoicesWorkspaceProps) {
-  const [kind, setKind] = useState<InvoiceKind | "all">("all");
+  const [status, setStatus] = useState<"all" | "issued" | "cancelled">("all");
   const [query, setQuery] = useState("");
 
   const rows = invoices.map((invoice) => {
@@ -40,17 +38,17 @@ export function InvoicesWorkspace({ invoices, parties, company }: InvoicesWorksp
     const issuedAs = registrationOn(company, invoice.stored?.regime);
     const tax = invoiceTax(issuedAs, invoice, party);
     const totals = invoiceTotals(invoice.lines, tax.regime);
-    return { invoice, party, tax, totals, stage: invoiceStage(invoice), missing: missingDocuments(invoice, totals.grandTotal, needsEinvoice(invoice, party, issuedAs)) };
+    return { invoice, party, tax, totals, stage: invoiceStage(invoice), missing: missingDocuments(invoice, totals.grandTotal, needsEinvoice(party, issuedAs)) };
   });
   const needle = query.trim().toLowerCase();
   const visible = rows.filter(
     ({ invoice, party }) =>
-      (kind === "all" || invoice.kind === kind) &&
+      (status === "all" || invoice.status === status) &&
       (!needle || `${invoice.number} ${party.displayName}`.toLowerCase().includes(needle)),
   );
 
-  const exportsOpen = rows.filter((row) => row.invoice.kind === "export" && row.invoice.status === "issued" && row.stage !== "Payment realised");
-  const awaitingBrc = exportsOpen.filter((row) => row.invoice.documents.leo || row.invoice.documents["shipping-bill"]).length;
+  const papersMissing = rows.filter((row) => row.invoice.status === "issued" && row.missing.length > 0).length;
+  const cancelled = rows.filter((row) => row.invoice.status === "cancelled").length;
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -61,24 +59,18 @@ export function InvoicesWorkspace({ invoices, parties, company }: InvoicesWorksp
           label="Billed"
           value={formatInr(rows.filter((row) => row.invoice.status === "issued").reduce((sum, row) => sum + row.totals.grandTotal, 0))}
         />
-        <StatTile label="Exports still open" value={formatQuantity(exportsOpen.length)} />
-        <StatTile label="Waiting for BRC" value={formatQuantity(awaitingBrc)} />
+        <StatTile label="Papers missing" value={formatQuantity(papersMissing)} />
+        <StatTile label="Cancelled" value={formatQuantity(cancelled)} />
       </div>
 
       <GlassCard className="flex flex-col gap-3.5">
 
         <ListToolbar
           actions={
-            <>
-              <Link href="/invoices/new/export" className={buttonClasses("success")}>
-                <Globe aria-hidden="true" />
-                New export invoice
-              </Link>
-              <Link href="/invoices/new/local" className={buttonClasses("primary", undefined, "lg")}>
-                <Plus aria-hidden="true" />
-                New local invoice
-              </Link>
-            </>
+            <Link href="/invoices/new" className={buttonClasses("primary", undefined, "lg")}>
+              <Plus aria-hidden="true" />
+              New invoice
+            </Link>
           }
         >
           <SearchField
@@ -90,10 +82,10 @@ export function InvoicesWorkspace({ invoices, parties, company }: InvoicesWorksp
             placeholder="Search by invoice number or customer"
             trailing={`${visible.length} of ${rows.length}`}
           />
-          <FilterGroup label="Invoice kind">
-            {(["all", "local", "export"] as const).map((option) => (
-              <FilterChip key={option} selected={kind === option} onClick={() => setKind(option)}>
-                {option === "all" ? "All invoices" : option === "local" ? "Local (GST)" : "Export"}
+          <FilterGroup label="Invoice status">
+            {(["all", "issued", "cancelled"] as const).map((option) => (
+              <FilterChip key={option} selected={status === option} onClick={() => setStatus(option)}>
+                {option === "all" ? "All invoices" : option === "issued" ? "Issued" : "Cancelled"}
               </FilterChip>
             ))}
           </FilterGroup>
@@ -113,7 +105,7 @@ export function InvoicesWorkspace({ invoices, parties, company }: InvoicesWorksp
           </thead>
           <tbody className="text-right font-semibold tabular-nums">
             {visible.map(({ invoice, party, tax, totals, stage, missing }) => {
-              const needed = invoice.kind === "export" ? documentsFor("export").length : missing.length + Object.keys(invoice.documents).length;
+              const needed = missing.length + Object.keys(invoice.documents).length;
               return (
                 <tr key={invoice.id} className="align-top">
                   <td className="text-left">
@@ -121,17 +113,15 @@ export function InvoicesWorkspace({ invoices, parties, company }: InvoicesWorksp
                       {invoice.number}
                     </Link>
                     <div className="text-xs text-muted">
-                      {formatDayMonth(invoice.date)} · {invoice.kind === "export" ? "Export" : "Local"}
+                      {formatDayMonth(invoice.date)}
                     </div>
                   </td>
                   <td className="text-left">
                     <div className="font-semibold">{party.displayName}</div>
-                    <div className="text-xs text-muted">
-                      {invoice.kind === "export" ? invoice.destinationCountry : stateName(invoice.placeOfSupply)}
-                    </div>
+                    <div className="text-xs text-muted">{stateName(invoice.placeOfSupply)}</div>
                   </td>
                   <td className="text-left">
-                    <StatusChip tone={invoice.kind === "export" ? "success" : "brand"}>{tax.title}</StatusChip>
+                    <StatusChip tone="brand">{tax.title}</StatusChip>
                   </td>
                   <td>{formatInr(totals.taxable)}</td>
                   <td className="font-semibold">{formatInr(totals.grandTotal)}</td>

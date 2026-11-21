@@ -6,7 +6,7 @@ import { DashboardController } from './dashboard.controller.js';
 import { DashboardService } from './dashboard.service.js';
 
 // The Dashboard's summary (SOW 1): sales, purchases, profit, outstanding,
-// papers missing, low stock, pending quotations and trucks. Read-only.
+// papers missing, low stock and pending quotations. Read-only.
 @Module({
   imports: [ProfitModule, SettlementsModule, DocumentRegisterModule],
   controllers: [DashboardController],

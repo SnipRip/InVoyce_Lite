@@ -1,7 +1,6 @@
 // Every report the business reads (SOW 16): title, group, description and
 // columns. The rows come from the backend (GET /reports/:id), keyed by these
 // columns.
-import { documentType } from "@/features/invoices/dispatch-documents";
 import type { Report } from "./types";
 
 const salesRegister: Report = {
@@ -138,49 +137,11 @@ const outstandingReport: Report = {
   ],
 };
 
-const shipmentReport: Report = {
-  id: "shipments",
-  title: "Shipment report",
-  group: "Export",
-  description: "Each truck to Bhutan with its stage, value and profit.",
-  period: true,
-  partyKey: "buyer",
-  columns: [
-    { key: "date", label: "Date", kind: "date" },
-    { key: "number", label: "Shipment", kind: "text" },
-    { key: "buyer", label: "Buyer", kind: "text" },
-    { key: "vehicle", label: "Vehicle", kind: "text" },
-    { key: "stage", label: "Stage", kind: "text" },
-    { key: "sales", label: "Sales", kind: "money" },
-    { key: "expenses", label: "Expenses", kind: "money" },
-    { key: "profit", label: "Profit", kind: "money" },
-  ],
-};
-
-const exportRegister: Report = {
-  id: "export-register",
-  title: "Export register",
-  group: "Export",
-  description: "Every export invoice with route, LUT, shipping bill, LEO and BRC: the papers the GST refund and FEMA ask for.",
-  period: true,
-  partyKey: "buyer",
-  columns: [
-    { key: "date", label: "Date", kind: "date" },
-    { key: "number", label: "Invoice", kind: "text" },
-    { key: "buyer", label: "Buyer", kind: "text" },
-    { key: "route", label: "Route", kind: "text" },
-    { key: "value", label: "Value", kind: "money" },
-    { key: "shippingBill", label: documentType("shipping-bill").name, kind: "text" },
-    { key: "leo", label: "LEO", kind: "text" },
-    { key: "brc", label: "BRC", kind: "text" },
-  ],
-};
-
 const placeOfSupplyReport: Report = {
   id: "sales-by-state",
   title: "Sales by place of supply",
   group: "GST",
-  description: "Taxable sales by state (and exports), for the state-wise split in returns.",
+  description: "Taxable sales by state, for the state-wise split in returns.",
   period: true,
   columns: [
     { key: "place", label: "Place of supply", kind: "text" },
@@ -296,8 +257,6 @@ export const REPORTS: Report[] = [
   receiptRegister,
   paymentRegister,
   outstandingReport,
-  shipmentReport,
-  exportRegister,
 ];
 
 export const findReport = (id: string) => REPORTS.find((report) => report.id === id);

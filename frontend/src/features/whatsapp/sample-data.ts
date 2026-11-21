@@ -51,15 +51,15 @@ export const templates: MessageTemplate[] = [
 ];
 
 export const optIns: OptIn[] = [
-  { id: "oi-1", name: "Tashi Construction", phone: "+97577000001", partyId: "tashi-construction", source: "website", at: "2026-10-12T10:42:00+05:30", consentVersion: "2026-10-01", status: "opted-in" },
-  { id: "oi-2", name: "Druk Builders", phone: "+97577000002", partyId: "druk-builders", source: "website", at: "2026-10-14T16:05:00+05:30", consentVersion: "2026-10-01", status: "opted-in" },
+  { id: "oi-1", name: "Jalpaiguri Builders", phone: "+919800000001", partyId: "jalpaiguri-builders", source: "website", at: "2026-10-12T10:42:00+05:30", consentVersion: "2026-10-01", status: "opted-in" },
+  { id: "oi-2", name: "Cooch Behar Construction", phone: "+919800000002", partyId: "cooch-behar-construction", source: "website", at: "2026-10-14T16:05:00+05:30", consentVersion: "2026-10-01", status: "opted-in" },
   { id: "oi-3", name: "Siliguri Infra Projects", phone: "+919800000003", partyId: "siliguri-infra", source: "counter", at: "2026-10-18T12:20:00+05:30", consentVersion: "2026-10-01", status: "opted-in" },
   { id: "oi-4", name: "Guwahati Hardware Mart", phone: "+919800000004", partyId: "guwahati-hardware", source: "website", at: "2026-10-20T09:15:00+05:30", consentVersion: "2026-10-01", status: "opted-out" },
 ];
 
 export const sentMessages: SentMessage[] = [
-  { id: "m-1", at: "2026-10-18T11:02:00+05:30", partyId: "tashi-construction", phone: "+97577000001", templateId: "quotation_sent", document: "QT/2627/0041-R1", status: "read" },
-  { id: "m-2", at: "2026-10-21T15:40:00+05:30", partyId: "tashi-construction", phone: "+97577000001", templateId: "invoice_issued", document: "EXP/2627/0004", status: "delivered" },
-  { id: "m-3", at: "2026-10-22T10:10:00+05:30", partyId: "druk-builders", phone: "+97577000002", templateId: "quotation_sent", document: "QT/2627/0043", status: "read" },
+  { id: "m-1", at: "2026-10-18T11:02:00+05:30", partyId: "jalpaiguri-builders", phone: "+919800000001", templateId: "quotation_sent", document: "QT/2627/0041-R1", status: "read" },
+  { id: "m-2", at: "2026-10-21T15:40:00+05:30", partyId: "jalpaiguri-builders", phone: "+919800000001", templateId: "invoice_issued", document: "INV/2627/0062", status: "delivered" },
+  { id: "m-3", at: "2026-10-22T10:10:00+05:30", partyId: "cooch-behar-construction", phone: "+919800000002", templateId: "quotation_sent", document: "QT/2627/0043", status: "read" },
   { id: "m-4", at: "2026-10-14T12:00:00+05:30", partyId: "siliguri-infra", phone: "+919800000003", templateId: "quotation_sent", document: "QT/2627/0044", status: "failed" },
 ];

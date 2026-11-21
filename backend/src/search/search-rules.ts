@@ -24,9 +24,4 @@ export const DOCUMENT_LABELS: Record<DispatchDocumentKind, string> = {
   E_INVOICE: 'IRN',
   LORRY_CHALLAN: 'Lorry challan',
   EWAY_BILL: 'E-way bill',
-  CUSTOMS_INVOICE: 'Customs invoice',
-  PACKING_LIST: 'Packing list',
-  SHIPPING_BILL: 'Shipping Bill',
-  LEO: 'LEO',
-  BRC: 'BRC',
 };

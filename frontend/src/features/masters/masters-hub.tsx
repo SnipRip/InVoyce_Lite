@@ -10,7 +10,7 @@ export interface MasterCard {
   /** What it holds, in one line. */
   description: string;
   /** e.g. "44 items · 6 groups"; a LiveCount for masters saved in the backend. */
-  count: ReactNode;
+  count?: ReactNode;
 }
 
 // The index of every master (agent/masters-plan.md), grouped as the plan

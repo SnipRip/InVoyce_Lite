@@ -10,18 +10,15 @@ import { PARTIES_PATH, toParty } from "@/features/parties/parties-api";
 import { useSalesSettings } from "@/features/sales-settings/sales-settings-api";
 import { issuerOf, QUOTATIONS_PATH } from "@/features/quotations/quotations-api";
 import { quotationLabel } from "@/features/quotations/quotation-rules";
-import { LUTS_PATH, toLut } from "@/features/tax-export/luts-api";
 import { apiGet } from "@/lib/api-client";
 import type { BankCashAccountView } from "@/types/bank-cash";
 import type { InvoiceView } from "@/types/invoice";
-import type { LutView } from "@/types/lut";
 import type { PartyView } from "@/types/party";
 import type { QuotationView } from "@/types/quotation";
 import { InvoiceDetail } from "./invoice-detail";
 import { InvoiceForm } from "./invoice-form";
 import { INVOICES_PATH, toInvoice } from "./invoices-api";
 import { InvoicesWorkspace } from "./invoices-workspace";
-import type { InvoiceKind } from "./types";
 import { CHALLANS_PATH } from "@/features/challans/challans-api";
 import type { ChallanView } from "@/types/challan";
 
@@ -29,29 +26,27 @@ import type { ChallanView } from "@/types/challan";
 const CUSTOMERS_PATH = `${PARTIES_PATH}?role=customer&includeArchived=true`;
 
 // The invoice pages' client screens: invoices, customers, our company
-// profile, the item master (with godowns) and the LUT register, from the backend.
+// profile and the item master (with godowns), from the backend.
 function useInvoiceData() {
   const invoices = useSWR<InvoiceView[]>(INVOICES_PATH, apiGet);
   const customers = useSWR<PartyView[]>(CUSTOMERS_PATH, apiGet);
-  const luts = useSWR<LutView[]>(LUTS_PATH, apiGet);
   const accounts = useSWR<BankCashAccountView[]>(BANK_CASH_PATH, apiGet);
   const { profile, error: profileError } = useCompanyProfile();
   const { masters, error: mastersError, reload: reloadMasters } = useItemMasters();
   const data = useMemo(() => {
-    if (!invoices.data || !customers.data || !luts.data || !profile || !masters) return undefined;
+    if (!invoices.data || !customers.data || !profile || !masters) return undefined;
     return {
       invoices: invoices.data.map(toInvoice),
       parties: customers.data.map(toParty),
-      luts: luts.data.map(toLut),
       issuer: issuerOf(profile),
       /** Printed on invoices; the bill prints without it while accounts load or none is marked. */
       bank: accounts.data?.find((account) => account.showOnInvoice && !account.isArchived && account.kind !== "CASH"),
       masters,
     };
-  }, [invoices.data, customers.data, luts.data, profile, masters, accounts.data]);
+  }, [invoices.data, customers.data, profile, masters, accounts.data]);
   return {
     data,
-    error: invoices.error ?? customers.error ?? luts.error ?? profileError ?? mastersError,
+    error: invoices.error ?? customers.error ?? profileError ?? mastersError,
     /** After a save or cancel: invoices, the items (stock moved) and quotations (one may be converted). */
     reload: async () => {
       await Promise.all([invoices.mutate(), reloadMasters()]);
@@ -73,7 +68,7 @@ export function InvoicesListScreen() {
  * `challanId` bills a delivery challan: its goods and quantities, at the
  * quotation's rates when it came from one.
  */
-export function NewInvoiceScreen({ kind, quotationId, challanId }: { kind: InvoiceKind; quotationId?: string; challanId?: string }) {
+export function NewInvoiceScreen({ quotationId, challanId }: { quotationId?: string; challanId?: string }) {
   const { data, error, reload } = useInvoiceData();
   const quotation = useSWR<QuotationView>(quotationId ? `${QUOTATIONS_PATH}/${quotationId}` : null, apiGet);
   const challan = useSWR<ChallanView>(challanId ? `${CHALLANS_PATH}/${challanId}` : null, apiGet);
@@ -99,11 +94,9 @@ export function NewInvoiceScreen({ kind, quotationId, challanId }: { kind: Invoi
   };
   return (
     <InvoiceForm
-      kind={kind}
       customers={data.parties.filter((party) => !party.archived)}
       catalog={data.masters.catalog}
       godowns={data.masters.godowns.filter((godown) => !godown.isArchived)}
-      luts={data.luts}
       company={data.issuer}
       inStockOnly={settings?.invoiceInStockOnly ?? false}
       fromQuotation={

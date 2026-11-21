@@ -1,5 +1,5 @@
 // Receipts and payments: who may pay whom through which account, how much
-// can be applied to what, the cash limit, BRC, due dates, ageing and the
+// can be applied to what, the cash limit, due dates, ageing and the
 // MSME 45-day rule. Pure; settlements.service.ts loads the facts.
 import { addDays } from '../common/dates.js';
 import type { BankCashKind, PaymentMode, SettlementDirection } from '../generated/prisma/enums.js';
@@ -84,12 +84,11 @@ export function refundPartyProblem(direction: SettlementDirection, party: { isCu
   return null;
 }
 
-/** A refund returns advances only, the whole amount of it, with no TDS and no BRC. */
-export function refundShapeProblem(refund: { kinds: TargetKind[]; amount: number; tds: number; applied: number; hasBrc: boolean }): string | null {
+/** A refund returns advances only, the whole amount of it, with no TDS. */
+export function refundShapeProblem(refund: { kinds: TargetKind[]; amount: number; tds: number; applied: number }): string | null {
   if (refund.kinds.length === 0) return 'Pick the advance or note to refund';
   if (refund.kinds.some((kind) => !isRefundKind(kind))) return 'A refund returns advances and note credits only: enter invoices or bills on a receipt or payment of their own';
   if (refund.tds > 0) return 'A refund carries no TDS';
-  if (refund.hasBrc) return 'A BRC is for a receipt against an export invoice';
   if (Math.abs(money(refund.amount) - money(refund.applied)) > EPSILON) return 'The refund amount is the total of what is refunded';
   return null;
 }
@@ -114,14 +113,6 @@ export function allocationProblem(allocations: AllocationPlan[], free: number): 
   return null;
 }
 
-/** A BRC: only on a receipt against an export invoice, dated on or after the receipt and not after today. */
-export function brcProblem(brc: { number: string; date: string } | null, receiptDate: string, today: string, hasExport: boolean): string | null {
-  if (!brc) return null;
-  if (!hasExport) return 'A BRC is for a receipt against an export invoice';
-  if (brc.date < receiptDate) return 'The BRC is dated before the receipt';
-  if (brc.date > today) return 'The BRC is dated after today';
-  return null;
-}
 
 export const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 

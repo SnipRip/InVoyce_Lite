@@ -7,7 +7,6 @@ export const profitPath = (from: string, to: string) => `/profit?from=${from}&to
 const PAGES: Record<NonNullable<ProfitRowView["kind"]>, string> = {
   invoice: "/invoices",
   creditNote: "/credit-notes",
-  shipment: "/shipments",
   customer: "/customers",
   item: "/items",
 };

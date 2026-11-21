@@ -35,7 +35,7 @@ const line = (overrides: Partial<SchemeLine> = {}): SchemeLine => ({
 });
 
 const DAY = '2026-11-05';
-const india = { id: 'c1', overseas: false };
+const india = { id: 'c1' };
 
 describe('applySchemes, line schemes', () => {
   it('takes a % off, capped at the maximum', () => {
@@ -107,14 +107,11 @@ describe('applySchemes, line schemes', () => {
     expect(applySchemes([scheme({ validFrom: '2026-11-06' })], [line()], india, DAY).totalDiscount).toBe(0);
     expect(applySchemes([scheme({ validTill: '2026-11-04' })], [line()], india, DAY).totalDiscount).toBe(0);
     expect(applySchemes([scheme({ isArchived: true })], [line()], india, DAY).totalDiscount).toBe(0);
-    const overseas = scheme({ partyScope: 'OVERSEAS' });
-    expect(applySchemes([overseas], [line()], india, DAY).totalDiscount).toBe(0);
-    expect(applySchemes([overseas], [line()], { id: 'b', overseas: true }, DAY).totalDiscount).toBe(300);
-    // A walk-in buyer (no customer) is in India.
-    expect(applySchemes([scheme({ partyScope: 'INDIA' })], [line()], null, DAY).totalDiscount).toBe(300);
+    // A walk-in buyer (no customer) gets schemes for all customers.
+    expect(applySchemes([scheme({ partyScope: 'ALL' })], [line()], null, DAY).totalDiscount).toBe(300);
     const selected = scheme({ partyScope: 'SELECTED', partyIds: ['c1'] });
     expect(applySchemes([selected], [line()], india, DAY).totalDiscount).toBe(300);
-    expect(applySchemes([selected], [line()], { id: 'c2', overseas: false }, DAY).totalDiscount).toBe(0);
+    expect(applySchemes([selected], [line()], { id: 'c2' }, DAY).totalDiscount).toBe(0);
   });
 });
 

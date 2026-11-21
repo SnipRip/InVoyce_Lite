@@ -18,6 +18,6 @@ export const chargesGst = (company: OurRegistration) => company.registration ===
 /** Why a sale outside our state is refused, for a business that may not make one. */
 export function outsideStateProblem(company: OurRegistration): string {
   return company.registration === 'COMPOSITION'
-    ? 'A composition dealer can sell only inside its own state: no exports, SEZ or other-state sales'
-    : 'An unregistered business can sell only inside its own state: register for GST to export or sell to other states';
+    ? 'A composition dealer can sell only inside its own state: no other-state sales'
+    : 'An unregistered business can sell only inside its own state: register for GST to sell to other states';
 }

@@ -9,7 +9,6 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { itemCostSource, itemCosts, stockOnHand, stockValue } from '../items/item-costs.js';
 import { inherited } from '../items/item-rules.js';
-import { ProfitService } from '../profit/profit.service.js';
 import { quotationLabel } from '../sale-pricing/sale-rules.js';
 import { SettlementsService } from '../settlements/settlements.service.js';
 import type { ReportQueryDto } from './dto/report-query.dto.js';
@@ -23,9 +22,7 @@ import {
   quotationStage,
   REPORT_SOURCES,
   REPORTS_MODULE,
-  shipmentStage,
   stockStatus,
-  sumOf,
   type ReportId,
   type ReportRow,
 } from './report-rules.js';
@@ -56,7 +53,6 @@ const n = toNumber;
 export class ReportsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly profit: ProfitService,
     private readonly settlements: SettlementsService,
   ) {}
 
@@ -70,14 +66,14 @@ export class ReportsService {
     const to = query.to ?? todayInIndia();
     const from = query.from ?? `${financialYearOf(to).slice(0, 4)}-04-01`;
     if (from > to) throw new BadRequestException('The first day is after the last day');
-    return { from, to, rows: await this.rowsForPeriod(id, { gte: dateOnly(from), lte: dateOnly(to) }, from, to) };
+    return { from, to, rows: await this.rowsForPeriod(id, { gte: dateOnly(from), lte: dateOnly(to) }) };
   }
 
   private rowsAsOfToday(id: ReportId): Promise<ReportRow[]> {
     return id === 'stock-summary' ? this.stockSummary() : this.outstanding();
   }
 
-  private rowsForPeriod(id: ReportId, period: Period, from: string, to: string): Promise<ReportRow[]> {
+  private rowsForPeriod(id: ReportId, period: Period): Promise<ReportRow[]> {
     switch (id) {
       case 'sales-register':
         return this.salesRegister(period);
@@ -93,18 +89,14 @@ export class ReportsService {
         return this.salesByState(period);
       case 'expenses':
         return this.expensesByHead(period);
-      case 'shipments':
-        return this.shipments(period, from, to);
       case 'item-profit':
         return this.itemProfit(period);
       case 'notes-register':
         return this.notesRegister(period);
       case 'receipt-register':
         return this.moneyRegister(period, 'RECEIPT');
-      case 'payment-register':
-        return this.moneyRegister(period, 'PAYMENT');
       default:
-        return this.exportRegister(period);
+        return this.moneyRegister(period, 'PAYMENT');
     }
   }
 
@@ -346,12 +338,12 @@ export class ReportsService {
   private async gstSummary(period: Period): Promise<ReportRow[]> {
     const heads = { cgst: true, sgst: true, igst: true } as const;
     const [sales, bills, expenses, creditNotes, debitNotes] = await Promise.all([
-      this.prisma.invoice.findMany({ where: { status: 'ISSUED', date: period }, select: { ...heads, regime: true, taxable: true } }),
+      this.prisma.invoice.findMany({ where: { status: 'ISSUED', date: period }, select: heads }),
       this.prisma.purchaseBill.findMany({ where: { status: 'OPEN', date: period }, select: { ...heads, tax: true, itcClaimable: true, regime: true } }),
       this.prisma.expense.findMany({ where: { cancelledAt: null, itcEligible: true, date: period }, select: heads }),
       // Notes count in the period they are dated (GSTR-1 table 9B, GSTR-3B 4B).
       // Notes without GST never touch the returns.
-      this.prisma.creditNote.findMany({ where: { cancelledAt: null, gstAdjusted: true, date: period }, select: { ...heads, regime: true, taxable: true } }),
+      this.prisma.creditNote.findMany({ where: { cancelledAt: null, gstAdjusted: true, date: period }, select: heads }),
       this.prisma.debitNote.findMany({ where: { cancelledAt: null, gstAdjusted: true, date: period }, select: { ...heads, tax: true, itcReversed: true } }),
     ]);
     const split = (row: { cgst: Prisma.Decimal; sgst: Prisma.Decimal; igst: Prisma.Decimal }) => ({ cgst: n(row.cgst), sgst: n(row.sgst), igst: n(row.igst) });
@@ -362,14 +354,6 @@ export class ReportsService {
       bills.map((bill) => ({ ...split(bill), tax: n(bill.tax), itcClaimable: n(bill.itcClaimable), reverseCharge: bill.regime === 'REVERSE_CHARGE' })),
       // A debit note gives back the credit it reversed, by head in proportion.
       [...expenses.map(split), ...debitNotes.map((note) => negative(split(note), n(note.tax) > 0 ? n(note.itcReversed) / n(note.tax) : 0))],
-      sumOf(
-        sales.filter((sale) => sale.regime === 'EXPORT_LUT'),
-        (sale) => n(sale.taxable),
-      ) -
-        sumOf(
-          creditNotes.filter((note) => note.regime === 'EXPORT_LUT'),
-          (note) => n(note.taxable),
-        ),
     );
   }
 
@@ -412,7 +396,7 @@ export class ReportsService {
   private async salesByState(period: Period): Promise<ReportRow[]> {
     const rows = await this.prisma.invoice.findMany({
       where: { status: 'ISSUED', date: period },
-      select: { kind: true, placeOfSupply: true, destinationCountry: true, taxable: true },
+      select: { placeOfSupply: true, taxable: true },
     });
     const places = new Map<string, { place: string; invoices: number; taxable: number }>();
     for (const row of rows) {
@@ -490,61 +474,5 @@ export class ReportsService {
     add('Owes us', receivable);
     add('We owe', payable);
     return [...parties.values()].sort((a, b) => a.side.localeCompare(b.side) || b.balance - a.balance);
-  }
-
-  /** Trucks loaded in the period or carrying its invoices, with the profit report's figures for them. */
-  private async shipments(period: Period, from: string, to: string): Promise<ReportRow[]> {
-    const report = await this.profit.report({ from, to });
-    const profitOf = new Map(report.byShipment.filter((row) => row.kind === 'shipment').map((row) => [row.key, row]));
-    const rows = await this.prisma.shipment.findMany({
-      where: { cancelledAt: null, OR: [{ date: period }, { id: { in: [...profitOf.keys()] } }] },
-      orderBy: [{ date: 'asc' }, { number: 'asc' }],
-      select: { id: true, date: true, number: true, vehicleNumber: true, stage: true, party: { select: { displayName: true } } },
-    });
-    return rows.map((row) => {
-      const figures = profitOf.get(row.id);
-      return {
-        date: isoDate(row.date),
-        number: row.number,
-        buyer: row.party.displayName,
-        vehicle: row.vehicleNumber,
-        stage: shipmentStage(row.stage),
-        sales: figures?.sales ?? 0,
-        expenses: figures?.expenses ?? 0,
-        profit: figures?.profit ?? 0,
-        href: `/shipments/${row.id}`,
-      };
-    });
-  }
-
-  private async exportRegister(period: Period): Promise<ReportRow[]> {
-    const rows = await this.prisma.invoice.findMany({
-      where: { status: 'ISSUED', kind: 'EXPORT', date: period },
-      orderBy: [{ date: 'asc' }, { number: 'asc' }],
-      select: {
-        id: true,
-        date: true,
-        number: true,
-        regime: true,
-        lutArn: true,
-        taxable: true,
-        party: { select: { displayName: true } },
-        documents: { where: { kind: { in: ['SHIPPING_BILL', 'LEO', 'BRC'] } }, select: { kind: true, number: true } },
-      },
-    });
-    return rows.map((row) => {
-      const numberOf = (kind: 'SHIPPING_BILL' | 'LEO' | 'BRC') => row.documents.find((document) => document.kind === kind)?.number ?? 'Pending';
-      return {
-        date: isoDate(row.date),
-        number: row.number,
-        buyer: row.party.displayName,
-        route: row.regime === 'EXPORT_IGST' ? 'IGST paid' : `LUT ${row.lutArn ?? ''}`.trim(),
-        value: n(row.taxable),
-        shippingBill: numberOf('SHIPPING_BILL'),
-        leo: numberOf('LEO'),
-        brc: numberOf('BRC'),
-        href: `/invoices/${row.id}`,
-      };
-    });
   }
 }

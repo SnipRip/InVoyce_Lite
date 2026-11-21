@@ -1,21 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { shipmentProfit } from '../shipments/shipment-rules.js';
-import { buildProfitReport, shareByValue, type ProfitExpense, type ProfitInvoice, type ProfitShipment } from './profit-rules.js';
+import { buildProfitReport, profitOf, shareByValue, type ProfitExpense, type ProfitInvoice } from './profit-rules.js';
 
 const line = (itemId: string, taxable: number, costOfGoods: number) => ({ itemId, itemName: `Item ${itemId}`, sku: itemId.toUpperCase(), taxable, costOfGoods });
 
-const exportA: ProfitInvoice = {
+const saleA: ProfitInvoice = {
   id: 'a',
-  number: 'EXP/2627/0001',
+  number: 'INV/2627/0002',
   date: '2026-11-02',
-  partyId: 'druk',
-  partyName: 'Druk Builders',
+  partyId: 'gupta',
+  partyName: 'Gupta Builders',
   taxable: 60_000,
   cost: 45_000,
   lines: [line('tmt', 40_000, 30_000), line('pipe', 20_000, 15_000)],
-  shipmentId: 's1',
 };
-const exportB: ProfitInvoice = { ...exportA, id: 'b', number: 'EXP/2627/0002', taxable: 40_000, cost: 32_000, lines: [line('tmt', 40_000, 32_000)] };
+const saleB: ProfitInvoice = { ...saleA, id: 'b', number: 'INV/2627/0003', taxable: 40_000, cost: 32_000, lines: [line('tmt', 40_000, 32_000)] };
 const local: ProfitInvoice = {
   id: 'c',
   number: 'INV/2627/0001',
@@ -25,17 +23,6 @@ const local: ProfitInvoice = {
   taxable: 10_000,
   cost: 8_000,
   lines: [line('pipe', 10_000, 8_000)],
-  shipmentId: null,
-};
-const truck: ProfitShipment = {
-  id: 's1',
-  number: 'SHP/2627/0001',
-  vehicleNumber: 'BG2A1234',
-  destination: 'Thimphu',
-  invoices: [
-    { id: 'a', taxable: 60_000 },
-    { id: 'b', taxable: 40_000 },
-  ],
 };
 const expense = (id: string, cost: number, allocation: ProfitExpense['allocation'], target: Partial<ProfitExpense> = {}): ProfitExpense => ({
   id,
@@ -44,7 +31,6 @@ const expense = (id: string, cost: number, allocation: ProfitExpense['allocation
   cost,
   allocation,
   invoiceId: null,
-  shipmentId: null,
   ...target,
 });
 
@@ -60,39 +46,33 @@ describe('shareByValue', () => {
 
 describe('buildProfitReport', () => {
   const onSales = [
-    expense('freight', 6_000, 'SHIPMENT', { shipmentId: 's1' }),
+    expense('freight-a', 3_600, 'INVOICE', { invoiceId: 'a' }),
+    expense('freight-b', 2_400, 'INVOICE', { invoiceId: 'b' }),
     expense('loading', 1_200, 'INVOICE', { invoiceId: 'c' }),
-    expense('waiting', 700, 'SHIPMENT'),
   ];
   const overheads = [expense('rent', 18_000, 'OVERHEAD'), expense('power', 2_000, 'OVERHEAD', { headName: 'Electricity' })];
-  const report = buildProfitReport([exportA, exportB, local], [truck], onSales, overheads);
+  const report = buildProfitReport([saleA, saleB, local], onSales, overheads);
 
-  it('shares a truck’s expenses over its invoices by value', () => {
+  it('takes each invoice’s own expenses off its profit', () => {
     expect(report.byInvoice.map((row) => [row.label, row.expenses, row.profit])).toEqual([
-      ['EXP/2627/0001', 3_600, 11_400],
-      ['EXP/2627/0002', 2_400, 5_600],
+      ['INV/2627/0002', 3_600, 11_400],
+      ['INV/2627/0003', 2_400, 5_600],
       ['INV/2627/0001', 1_200, 800],
     ]);
-  });
-
-  it('gives a shipment the same figure as the shipment page when all its invoices are in the period', () => {
-    const row = report.byShipment.find((candidate) => candidate.key === 's1');
-    expect(row).toMatchObject(shipmentProfit([exportA, exportB], [6_000]));
-    expect(row?.detail).toBe('BG2A1234 to Thimphu');
+    expect(report.byInvoice[0]).toMatchObject(profitOf([saleA], [3_600]));
   });
 
   it('adds up to the same total in every view', () => {
-    for (const rows of [report.byInvoice, report.byShipment, report.byCustomer, report.byItem]) {
+    for (const rows of [report.byInvoice, report.byCustomer, report.byItem]) {
       expect(rows.reduce((sum, row) => sum + row.profit, 0)).toBeCloseTo(report.total.profit, 2);
       expect(rows.reduce((sum, row) => sum + row.expenses, 0)).toBeCloseTo(report.total.expenses, 2);
     }
     expect(report.total).toMatchObject({ sales: 110_000, cost: 85_000, expenses: 7_200, profit: 17_800 });
-    expect(report.byShipment.at(-1)).toMatchObject({ key: 'none', sales: 10_000 });
   });
 
   it('spreads an invoice’s expenses over its lines by value', () => {
     const tmt = report.byItem.find((row) => row.key === 'tmt');
-    // EXP 0001: 3,600 × 40/60 = 2,400; EXP 0002: 2,400.
+    // INV 0002: 3,600 × 40/60 = 2,400; INV 0003: 2,400.
     expect(tmt).toMatchObject({ sales: 80_000, cost: 62_000, expenses: 4_800, profit: 13_200 });
   });
 
@@ -106,10 +86,9 @@ describe('buildProfitReport', () => {
       taxable: -2_000,
       cost: -1_600,
       lines: [line('pipe', -2_000, -1_600)],
-      shipmentId: null,
       creditNoteOf: 'INV/2526/0099',
     };
-    const report = buildProfitReport([local, earlierReturn], [], [], []);
+    const report = buildProfitReport([local, earlierReturn], [], []);
     const row = report.byInvoice.find((candidate) => candidate.key === 'cn1')!;
     expect(row.kind).toBe('creditNote');
     expect(row.detail).toContain('INV/2526/0099');
@@ -118,25 +97,18 @@ describe('buildProfitReport', () => {
     expect(report.byItem.find((candidate) => candidate.key === 'pipe')!.sales).toBe(8_000);
   });
 
-  it('takes overheads and unlinked shipment expenses off for net profit', () => {
+  it('takes overheads off for net profit', () => {
     expect(report.overheads.total).toBe(20_000);
     expect(report.overheads.byHead).toEqual([
       { head: 'Rent', amount: 18_000, count: 1 },
       { head: 'Electricity', amount: 2_000, count: 1 },
     ]);
-    expect(report.unassigned).toEqual({ total: 700, count: 1 });
-    expect(report.netProfit).toBe(17_800 - 20_000 - 700);
-  });
-
-  it('notes a truck only partly in the period and counts only that part', () => {
-    const partial = buildProfitReport([exportA], [truck], [onSales[0]!], []);
-    expect(partial.byShipment[0]).toMatchObject({ sales: 60_000, expenses: 3_600 });
-    expect(partial.byShipment[0]?.detail).toContain('1 of 2 invoices in this period');
+    expect(report.netProfit).toBe(17_800 - 20_000);
   });
 
   it('counts nothing for an empty period', () => {
-    const empty = buildProfitReport([], [], [], []);
+    const empty = buildProfitReport([], [], []);
     expect(empty.total).toEqual({ sales: 0, cost: 0, expenses: 0, profit: 0, marginPct: 0 });
-    expect(empty.byShipment).toEqual([]);
+    expect(empty.byInvoice).toEqual([]);
   });
 });

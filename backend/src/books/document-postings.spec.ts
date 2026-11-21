@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { customerOwes } from '../invoices/invoice-rules.js';
 import { billPostings, type PostedBill } from './bill-postings.js';
 import { closingStock } from './closing-stock.js';
 import { expensePostings } from './expense-postings.js';
@@ -10,7 +9,7 @@ import { systemLedgers } from './system-ledgers.js';
 import { imbalance } from './voucher-lines.js';
 
 const ledgers = systemLedgers([{ name: 'Round Off A/c', systemRole: 'ROUND_OFF' }]);
-const customer = { ledger: 'Dorji Traders', group: 'Sundry Debtors' };
+const customer = { ledger: 'Sharma Traders', group: 'Sundry Debtors' };
 const vendor = { ledger: 'Tata Steel Ltd', group: 'Sundry Creditors' };
 const bank = { ledger: 'SBI Current', group: 'Bank Accounts' };
 
@@ -28,7 +27,7 @@ describe('invoice postings', () => {
   it('books a local invoice to sales, CGST + SGST and round off', () => {
     const lines = invoicePostings({ regime: 'INTRA_STATE', taxable: 10_000.4, cgst: 900.04, sgst: 900.04, igst: 0, roundOff: -0.48, total: 11_800 }, customer, ledgers);
     expect(byLedger(lines)).toEqual({
-      'Dorji Traders': 11_800,
+      'Sharma Traders': 11_800,
       'Sales - GST Local': -10_000.4,
       'Output CGST': -900.04,
       'Output SGST': -900.04,
@@ -39,26 +38,7 @@ describe('invoice postings', () => {
 
   it('books an interstate invoice to IGST', () => {
     const lines = invoicePostings({ regime: 'INTER_STATE', taxable: 5_000, cgst: 0, sgst: 0, igst: 900, roundOff: 0, total: 5_900 }, customer, ledgers);
-    expect(byLedger(lines)).toEqual({ 'Dorji Traders': 5_900, 'Sales - GST Interstate': -5_000, 'Output IGST': -900 });
-  });
-
-  it('books an export under LUT with no GST', () => {
-    const lines = invoicePostings({ regime: 'EXPORT_LUT', taxable: 2_00_000, cgst: 0, sgst: 0, igst: 0, roundOff: 0, total: 2_00_000 }, customer, ledgers);
-    expect(byLedger(lines)).toEqual({ 'Dorji Traders': 2_00_000, 'Export Sales - LUT': -2_00_000 });
-  });
-
-  it('books IGST on an export as ours to claim back: the buyer owes the goods value', () => {
-    const invoice = { regime: 'EXPORT_IGST' as const, taxable: 1_000.4, cgst: 0, sgst: 0, igst: 180.07, roundOff: -0.47, total: 1_180 };
-    const lines = invoicePostings(invoice, customer, ledgers);
-    expect(customerOwes(invoice)).toBe(999.93);
-    expect(byLedger(lines)).toEqual({
-      'Dorji Traders': 999.93,
-      'IGST Refund Receivable': 180.07,
-      'Export Sales - IGST': -1_000.4,
-      'Output IGST': -180.07,
-      'Round Off A/c': 0.47,
-    });
-    expect(imbalance(lines)).toBe(0);
+    expect(byLedger(lines)).toEqual({ 'Sharma Traders': 5_900, 'Sales - GST Interstate': -5_000, 'Output IGST': -900 });
   });
 });
 
@@ -164,7 +144,7 @@ describe('bill postings', () => {
 describe('settlement postings', () => {
   it('books a receipt with TDS deducted by the customer', () => {
     const lines = settlementPostings({ direction: 'RECEIPT', amount: 98_000, tds: 2_000 }, customer, bank, ledgers);
-    expect(byLedger(lines)).toEqual({ 'SBI Current': 98_000, 'TDS Receivable': 2_000, 'Dorji Traders': -1_00_000 });
+    expect(byLedger(lines)).toEqual({ 'SBI Current': 98_000, 'TDS Receivable': 2_000, 'Sharma Traders': -1_00_000 });
   });
 
   it('books a payment with TDS we deducted', () => {
@@ -179,7 +159,7 @@ describe('settlement postings', () => {
   // A refund is an entry of the other direction (Payment / Receipt voucher Agst Ref the advance).
   it('books a refund of a customer advance as a payment voucher: Dr customer, Cr bank', () => {
     const lines = settlementPostings({ direction: 'PAYMENT', amount: 15_000, tds: 0 }, customer, bank, ledgers);
-    expect(byLedger(lines)).toEqual({ 'Dorji Traders': 15_000, 'SBI Current': -15_000 });
+    expect(byLedger(lines)).toEqual({ 'Sharma Traders': 15_000, 'SBI Current': -15_000 });
   });
 
   it('books a vendor refunding our advance as a receipt voucher: Dr bank, Cr vendor', () => {

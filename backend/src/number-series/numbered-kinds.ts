@@ -53,11 +53,6 @@ const MASTER_CODE = {
 export const KIND_RULES: Record<NumberedKind, KindRules> = {
   QUOTATION: { label: 'quotation', ...OTHER_DOCUMENT, scope: 'QUOTATION' },
   SALES_INVOICE: { label: 'sales invoice', ...GST_DOCUMENT, scope: 'INVOICE' },
-  EXPORT_INVOICE: {
-    label: 'export invoice',
-    ...GST_DOCUMENT,
-    scope: 'INVOICE',
-  },
   // Our own reference; the vendor's bill number is stored beside it.
   PURCHASE_ORDER: { label: 'purchase order', ...OTHER_DOCUMENT, scope: 'PURCHASE_ORDER' },
   PURCHASE: { label: 'purchase', ...OTHER_DOCUMENT, scope: 'PURCHASE' },
@@ -79,7 +74,6 @@ export const KIND_RULES: Record<NumberedKind, KindRules> = {
   },
   // CGST rule 55: a challan is a GST document, numbered like one (16 characters, once a year).
   DELIVERY_CHALLAN: { label: 'delivery challan', ...GST_DOCUMENT, scope: 'DELIVERY_CHALLAN' },
-  SHIPMENT: { label: 'shipment', ...OTHER_DOCUMENT, scope: 'SHIPMENT' },
   EXPENSE: { label: 'expense', ...OTHER_DOCUMENT, scope: 'EXPENSE' },
   CUSTOMER_CODE: {
     label: 'customer code',

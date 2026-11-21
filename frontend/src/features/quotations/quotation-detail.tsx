@@ -195,7 +195,7 @@ export function QuotationDetail({ quotation, party: customer, issuer, items, onC
                 <Link href={`/delivery-challans/new?quotation=${quotation.id}`} className={buttonClasses("neutral")}>
                   Send on a delivery challan
                 </Link>
-                <Link href={`/invoices/new/${tax.regime === "export-lut" || tax.regime === "export-igst" ? "export" : "local"}?quotation=${quotation.id}`} className={buttonClasses("success")}>
+                <Link href={`/invoices/new?quotation=${quotation.id}`} className={buttonClasses("success")}>
                   Convert to invoice
                 </Link>
               </>

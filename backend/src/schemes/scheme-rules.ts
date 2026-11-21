@@ -20,7 +20,7 @@
 
 export type SchemeLevel = 'LINE' | 'ORDER';
 export type SchemeBenefit = 'PERCENT' | 'AMOUNT_PER_UNIT' | 'FLAT_AMOUNT' | 'FREE_QUANTITY';
-export type SchemePartyScope = 'ALL' | 'INDIA' | 'OVERSEAS' | 'SELECTED';
+export type SchemePartyScope = 'ALL' | 'SELECTED';
 export type SchemeRateSource = 'SHEET' | 'SPECIAL' | 'MANUAL';
 
 /** Exactly one of the three. */
@@ -60,8 +60,6 @@ export interface SchemeItem {
 
 export interface SchemeParty {
   id: string;
-  /** Overseas or SEZ: a buyer outside India. */
-  overseas: boolean;
 }
 
 export interface SchemeLine {
@@ -111,15 +109,11 @@ const quantity3 = (value: number) => Math.round(value * 1000) / 1000;
 export const schemeInForce = (scheme: Pick<SchemeFacts, 'validFrom' | 'validTill' | 'isArchived'>, date: string) =>
   !scheme.isArchived && scheme.validFrom <= date && (scheme.validTill === null || scheme.validTill >= date);
 
-/** Whether the scheme is for this buyer. No party is a walk-in buyer in India. */
+/** Whether the scheme is for this buyer. No party is a walk-in buyer. */
 export function schemeForParty(scheme: Pick<SchemeFacts, 'partyScope' | 'partyIds'>, party: SchemeParty | null): boolean {
   switch (scheme.partyScope) {
     case 'ALL':
       return true;
-    case 'INDIA':
-      return !party?.overseas;
-    case 'OVERSEAS':
-      return Boolean(party?.overseas);
     case 'SELECTED':
       return Boolean(party && scheme.partyIds.includes(party.id));
   }

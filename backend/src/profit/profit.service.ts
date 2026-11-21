@@ -5,7 +5,7 @@ import { financialYearOf } from '../common/financial-year.js';
 import { BooksService } from '../books/books.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { ProfitQueryDto } from './dto/profit-query.dto.js';
-import { buildProfitReport, type ProfitExpense, type ProfitInvoice, type ProfitReport, type ProfitShipment } from './profit-rules.js';
+import { buildProfitReport, type ProfitExpense, type ProfitInvoice, type ProfitReport } from './profit-rules.js';
 
 export interface ProfitReportView extends ProfitReport {
   from: string;
@@ -16,10 +16,8 @@ export interface ProfitReportView extends ProfitReport {
   otherExpenses: number;
 }
 
-// Read-only, three queries: the period's issued invoices with their lines,
-// the trucks carrying them (with every invoice on each, the base their
-// expenses are shared on), and the live expenses that touch them plus the
-// period's overheads and unlinked shipment expenses.
+// Read-only: the period's issued invoices with their lines, and the live
+// expenses that touch them plus the period's overheads.
 @Injectable()
 export class ProfitService {
   constructor(
@@ -48,36 +46,20 @@ export class ProfitService {
           orderBy: { position: 'asc' },
           select: { id: true, itemId: true, taxable: true, costOfGoods: true, item: { select: { name: true, sku: true } } },
         },
-        shipments: { where: { released: false }, take: 1, select: { shipmentId: true } },
       },
     });
     const invoiceIds = invoiceRows.map((row) => row.id);
-    const shipmentIds = [...new Set(invoiceRows.flatMap((row) => row.shipments.map((link) => link.shipmentId)))];
 
-    const [shipmentRows, expenseRows] = await Promise.all([
-      this.prisma.shipment.findMany({
-        where: { id: { in: shipmentIds } },
-        select: {
-          id: true,
-          number: true,
-          vehicleNumber: true,
-          destination: true,
-          invoices: { where: { released: false, invoice: { status: 'ISSUED' } }, select: { invoice: { select: { id: true, taxable: true } } } },
-        },
-      }),
-      this.prisma.expense.findMany({
-        where: {
-          cancelledAt: null,
-          OR: [
-            { allocation: 'INVOICE', invoiceId: { in: invoiceIds } },
-            { allocation: 'SHIPMENT', shipmentId: { in: shipmentIds } },
-            { allocation: 'SHIPMENT', shipmentId: null, date: period },
-            { allocation: 'OVERHEAD', date: period },
-          ],
-        },
-        select: { id: true, date: true, cost: true, allocation: true, invoiceId: true, shipmentId: true, head: { select: { name: true } } },
-      }),
-    ]);
+    const expenseRows = await this.prisma.expense.findMany({
+      where: {
+        cancelledAt: null,
+        OR: [
+          { allocation: 'INVOICE', invoiceId: { in: invoiceIds } },
+          { allocation: 'OVERHEAD', date: period },
+        ],
+      },
+      select: { id: true, date: true, cost: true, allocation: true, invoiceId: true, head: { select: { name: true } } },
+    });
 
     // Credit notes up to the last day take their value and returned cost off
     // the invoice line they are against (sales returns, rate differences).
@@ -111,7 +93,6 @@ export class ProfitService {
         taxable: net(toNumber(line.taxable) - lineTaken(line.id).taxable),
         costOfGoods: net(toNumber(line.costOfGoods) - lineTaken(line.id).cost),
       })),
-      shipmentId: row.shipments[0]?.shipmentId ?? null,
     }));
     // A credit note dated in the period against an invoice from before it is a
     // sales return of this period: a negative sale of its own, so the return
@@ -146,18 +127,10 @@ export class ProfitService {
         taxable: net(lines.reduce((sum, line) => sum + line.taxable, 0)),
         cost: net(lines.reduce((sum, line) => sum + line.costOfGoods, 0)),
         lines,
-        shipmentId: null,
         creditNoteOf: note.invoice.number,
       });
     }
 
-    const shipments: ProfitShipment[] = shipmentRows.map((row) => ({
-      id: row.id,
-      number: row.number,
-      vehicleNumber: row.vehicleNumber,
-      destination: row.destination,
-      invoices: row.invoices.map(({ invoice }) => ({ id: invoice.id, taxable: toNumber(invoice.taxable) })),
-    }));
     const expenses: ProfitExpense[] = expenseRows.map((row) => ({
       id: row.id,
       date: isoDate(row.date),
@@ -165,12 +138,11 @@ export class ProfitService {
       cost: toNumber(row.cost),
       allocation: row.allocation,
       invoiceId: row.invoiceId,
-      shipmentId: row.shipmentId,
     }));
 
     const overheads = expenses.filter((expense) => expense.allocation === 'OVERHEAD');
     const onSales = expenses.filter((expense) => expense.allocation !== 'OVERHEAD');
-    const report = buildProfitReport(invoices, shipments, onSales, overheads);
+    const report = buildProfitReport(invoices, onSales, overheads);
     // Net profit as the books see it: indirect incomes in, every indirect expense out (client, 12 Nov 2026).
     const other = await this.books.indirectMovements(from, to);
     return {

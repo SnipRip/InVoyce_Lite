@@ -31,12 +31,3 @@ export interface PendingQuotation {
   validUntil: string;
   status: QuotationStatus;
 }
-
-export interface ShipmentRow {
-  id: string;
-  number: string;
-  vehicle: string;
-  status: string;
-  tone: StatusTone;
-  detail: string;
-}

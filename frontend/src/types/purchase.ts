@@ -5,7 +5,7 @@ import type { DocumentBranch } from "./party";
 import type { PaymentModeView } from "./settlement";
 
 export type LandedCostMethodView = "VALUE" | "QUANTITY" | "WEIGHT";
-export type PurchaseRegimeView = "INTRA_STATE" | "INTER_STATE" | "NO_GST" | "REVERSE_CHARGE" | "IMPORT";
+export type PurchaseRegimeView = "INTRA_STATE" | "INTER_STATE" | "NO_GST" | "REVERSE_CHARGE";
 
 export interface PurchaseBillLineView {
   id: string;

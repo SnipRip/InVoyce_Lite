@@ -9,7 +9,7 @@ type Db = Prisma.TransactionClient;
 
 export async function ourRegistration(db: Db): Promise<OurRegistration> {
   const profile = await db.companyProfile.findUnique({ where: { id: 1 }, select: { stateCode: true, registration: true, enforceHsnGstRate: true } });
-  if (!profile?.stateCode) throw new ConflictException('Set the company GST state on GST & export setup first');
+  if (!profile?.stateCode) throw new ConflictException('Set the company GST state on Company & GST setup first');
   return profile;
 }
 

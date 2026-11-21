@@ -47,7 +47,6 @@ type InvoiceRow = Prisma.InvoiceGetPayload<{ include: typeof invoiceInclude }>;
 
 export const toInvoiceView = (invoice: InvoiceRow) => ({
   id: invoice.id,
-  kind: invoice.kind,
   number: invoice.number,
   date: isoDate(invoice.date),
   partyId: invoice.partyId,
@@ -61,9 +60,6 @@ export const toInvoiceView = (invoice: InvoiceRow) => ({
   regime: invoice.regime,
   gstApplicable: invoice.gstApplicable,
   placeOfSupply: invoice.placeOfSupply,
-  lutArn: invoice.lutArn,
-  destinationCountry: invoice.destinationCountry,
-  currency: invoice.currency,
   shipToLine: invoice.shipToLine,
   shipToCity: invoice.shipToCity,
   vehicleNumber: invoice.vehicleNumber,

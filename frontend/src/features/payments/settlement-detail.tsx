@@ -137,11 +137,6 @@ export function SettlementDetail({ settlement, documents, issuer, onChanged }: S
           · {modeText(settlement.mode)} · {settlement.accountName}
           {settlement.reference && ` · ${settlement.reference}`}
         </p>
-        {settlement.brc && (
-          <p className="text-xs font-semibold text-success-strong">
-            BRC {settlement.brc.number} dated {formatDate(settlement.brc.date)}
-          </p>
-        )}
         {settlement.notes && <p className="text-sm text-ink-soft">{settlement.notes}</p>}
         {!live && (
           <p className="text-sm font-semibold text-danger-strong">

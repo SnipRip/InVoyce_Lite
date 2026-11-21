@@ -33,10 +33,9 @@ function wholeInWords(value: number): string {
     .join(" ");
 }
 
-export function amountInWords(amount: number, currency: "INR" | "BTN" = "INR"): string {
+export function amountInWords(amount: number): string {
   const rounded = Math.round(amount * 100);
   const whole = Math.floor(rounded / 100);
   const fraction = rounded % 100;
-  const [major, minor] = currency === "BTN" ? ["Ngultrum", "Chhertum"] : ["Rupees", "Paise"];
-  return `${major} ${wholeInWords(whole)}${fraction ? ` and ${belowHundred(fraction)} ${minor}` : ""} Only`;
+  return `Rupees ${wholeInWords(whole)}${fraction ? ` and ${belowHundred(fraction)} Paise` : ""} Only`;
 }

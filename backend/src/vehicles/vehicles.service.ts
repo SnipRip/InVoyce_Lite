@@ -61,7 +61,7 @@ export class VehiclesService {
     });
   }
 
-  /** A vehicle a shipment used is in use (409 from the filter): archive it instead. */
+  /** A vehicle an invoice or transfer used is in use (409 from the filter): archive it instead. */
   async remove(id: string): Promise<void> {
     await this.prisma.vehicle.delete({ where: { id } });
   }

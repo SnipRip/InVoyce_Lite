@@ -12,7 +12,7 @@ function fakePrisma() {
       return Promise.resolve([]);
     },
   });
-  const names = ['item', 'party', 'quotation', 'invoice', 'invoiceDocument', 'purchaseBill', 'shipment', 'stockTransfer', 'settlement', 'expense', 'vehicle'];
+  const names = ['item', 'party', 'quotation', 'invoice', 'invoiceDocument', 'purchaseBill', 'stockTransfer', 'settlement', 'expense', 'vehicle'];
   return { prisma: Object.fromEntries(names.map((name) => [name, table(name)])) as unknown as PrismaService, searched };
 }
 
@@ -27,14 +27,14 @@ const auth = (role: AuthContext['role'], permissions: AuthContext['permissions']
 describe('SearchService', () => {
   it('searches only the screens the role may view', async () => {
     const { prisma, searched } = fakePrisma();
-    await new SearchService(prisma).search(auth('STAFF', { '/invoices': ['view'], '/vendors': ['view'], '/shipments': ['create'] }), 'wb73');
+    await new SearchService(prisma).search(auth('STAFF', { '/invoices': ['view'], '/vendors': ['view'], '/quotations': ['create'] }), 'wb73');
     expect(searched.sort()).toEqual(['invoice', 'invoiceDocument', 'party']);
   });
 
   it('searches everything for an administrator, nothing for a blank query', async () => {
     const admin = fakePrisma();
     await new SearchService(admin.prisma).search(auth('ADMIN'), 'wb73');
-    expect(admin.searched).toHaveLength(11);
+    expect(admin.searched).toHaveLength(10);
     const blank = fakePrisma();
     expect(await new SearchService(blank.prisma).search(auth('ADMIN'), '   ')).toEqual([]);
     expect(blank.searched).toEqual([]);

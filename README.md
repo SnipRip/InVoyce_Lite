@@ -1,6 +1,8 @@
 # InVoyce Lite
 
-Billing, inventory, GST, export and accounts for growing businesses. The lite edition of InVoyce.
+Billing, payments, inventory, GST and accounts for growing businesses in
+India. The lite edition of InVoyce. Domestic sales only: there are no export
+invoices, shipments, LUT register or overseas parties.
 
 | Folder      | What it is                                  | Stack                              |
 | ----------- | ------------------------------------------- | ---------------------------------- |
@@ -12,14 +14,22 @@ by Next.js to the backend, so the session cookie stays same-origin.
 
 ## What works today
 
-- Sign in and sign out, with lockout after 5 failed attempts
-- User settings: change name, display name, phone and password
-- Signed-in devices: list them and sign any of them out
-- Collapsible sidebar listing every module
-- Recording WhatsApp opt-ins sent by the business's website
+- Sales: quotations, delivery challans, GST tax invoices (CGST + SGST in our
+  state, IGST for other states, or a bill of supply when we charge no GST),
+  credit notes, and the IRN, lorry challan and e-way bill kept on each invoice
+- Payments: receipts from customers, payments to vendors, advances, refunds,
+  what is owed and ageing, and the MSME 45-day rule
+- Purchases: purchase orders, vendor bills with input credit and reverse
+  charge, debit notes, expenses, and freight landed on item cost
+- Stock: items, godowns, transfers and adjustments, drawn oldest first
+- Accounts: journals, loans, trial balance, Profit & Loss, balance sheet,
+  actual profit by invoice, customer and item, and reports
+- Masters: customers, vendors, transporters, vehicles, HSN / SAC codes,
+  company & GST setup, number series, bank & cash, ledgers
+- Sign-in with lockout, user settings, signed-in devices and roles
 
-The Dashboard and Rate enquiry screens are built but show **sample
-data** (each says so on screen). The other modules open a "Not built yet" page.
+The WhatsApp screen and parts of the Users screen still show **sample data**
+(each says so on screen).
 
 ## Run it locally
 

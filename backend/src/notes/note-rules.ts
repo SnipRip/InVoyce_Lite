@@ -120,8 +120,7 @@ export function noteDateProblem(noteDate: string, documentDate: string, today: s
  * How a note's amount settles (client, 13 Nov 2026): its own document first,
  * up to what is still due there; anything over that (goods returned after the
  * document was paid) is the party's credit, applied later to another of their
- * documents or refunded. `partyAmount` is what the note takes off the party:
- * a credit note on an export with IGST takes off the goods value only.
+ * documents or refunded. `partyAmount` is what the note takes off the party.
  */
 export function settleOnDocument(partyAmount: number, stillDue: number): { onDocument: number; credit: number } {
   const onDocument = money(Math.max(Math.min(partyAmount, stillDue), 0));

@@ -1,6 +1,6 @@
 // Calls for the customer and vendor master, and the conversion between the
 // backend's party and the one the screens use.
-import type { ExportRoute, GstTreatment } from "@/features/gst/gst-rules";
+import type { GstTreatment } from "@/features/gst/gst-rules";
 import { apiRequest } from "@/lib/api-client";
 import type { PartyView } from "@/types/party";
 import type { BranchFormValues, PartyFormValues } from "./party-schema";
@@ -27,14 +27,10 @@ export function toParty(view: PartyView): Party {
     gstin: orUndefined(view.gstin),
     pan: orUndefined(view.pan),
     placeOfSupply: orUndefined(view.placeOfSupply),
-    foreignTaxId: orUndefined(view.foreignTaxId),
-    currency: view.currency,
-    exportRoute: view.exportRoute ? (view.exportRoute.toLowerCase() as ExportRoute) : undefined,
     billing: {
       line1: view.addressLine ?? "",
       city: view.city ?? "",
       stateCode: orUndefined(view.placeOfSupply),
-      country: orUndefined(view.country),
       pin: orUndefined(view.pin),
     },
     creditDays: view.creditDays,
@@ -96,7 +92,7 @@ function childrenBody(values: PartyFormValues) {
   return {
     branches: values.branches.map((branch) => {
       const own = branch.kind === "branch";
-      const withGstin = own && (branch.treatment === "registered" || branch.treatment === "composition" || branch.treatment === "sez");
+      const withGstin = own && (branch.treatment === "registered" || branch.treatment === "composition");
       return {
         ...(branch.stored ? { id: branch.key } : { key: branch.key }),
         kind: own ? "BRANCH" : "SHIP_TO",
@@ -131,8 +127,7 @@ function childrenBody(values: PartyFormValues) {
 // Form values → request body. Fields that do not apply to the treatment or
 // roles are sent as null; the backend clears them too.
 function partyBody(values: PartyFormValues) {
-  const overseas = values.treatment === "overseas";
-  const withGstin = values.treatment === "registered" || values.treatment === "composition" || values.treatment === "sez";
+  const withGstin = values.treatment === "registered" || values.treatment === "composition";
   const isCustomer = values.roles.includes("customer");
   const isVendor = values.roles.includes("vendor");
   return {
@@ -147,16 +142,12 @@ function partyBody(values: PartyFormValues) {
     treatment: values.treatment.toUpperCase(),
     gstin: withGstin ? orNull(values.gstin) : null,
     pan: withGstin ? orNull(values.pan) : null,
-    placeOfSupply: overseas ? null : orNull(values.placeOfSupply),
-    country: overseas ? orNull(values.country) : null,
-    foreignTaxId: overseas ? orNull(values.foreignTaxId) : null,
-    currency: overseas ? values.currency : "INR",
-    exportRoute: overseas && isCustomer ? values.exportRoute.toUpperCase() : null,
+    placeOfSupply: orNull(values.placeOfSupply),
     isGta: isVendor && values.isGta,
     transin: isVendor && !withGstin ? orNull(values.transin) : null,
     addressLine: orNull(values.addressLine),
     city: orNull(values.city),
-    pin: overseas ? null : orNull(values.pin),
+    pin: orNull(values.pin),
     creditDays: Number(values.creditDays),
     creditLimit: amountOrNull(values.creditLimit),
     openingBalance: amountOrNull(values.openingBalance) ?? 0,

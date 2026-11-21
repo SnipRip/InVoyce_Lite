@@ -23,7 +23,7 @@ export const expenseSchema = z
     mode: z.enum(["BANK_TRANSFER", "CHEQUE", "UPI", "CASH"]),
     accountId: z.string(),
     reference: z.string().trim().max(40),
-    allocationKind: z.enum(["item-cost", "invoice", "shipment", "overhead"]),
+    allocationKind: z.enum(["item-cost", "invoice", "overhead"]),
     targetId: z.string(),
     notes: z.string().trim().max(300),
   })

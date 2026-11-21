@@ -31,7 +31,7 @@ interface VehicleSelectProps {
 /** Live vendors, the transporters a new hired vehicle can belong to. */
 const LIVE_VENDORS_PATH = `${PARTIES_PATH}?role=vendor`;
 
-// The "Vehicle" picker on shipments, invoices and stock transfers. Picking
+// The "Vehicle" picker on invoices and stock transfers. Picking
 // one fills the number (the server records the master's number), "Not on the
 // list" lets the number be typed. The "+" (client, 12 Nov 2026) adds a
 // vehicle to the master with its own fields and picks it here.

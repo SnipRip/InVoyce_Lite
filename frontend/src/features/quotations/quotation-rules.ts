@@ -18,7 +18,7 @@ export function quotationStage(quotation: Pick<Quotation, "status" | "validUntil
 }
 
 export const quotationTax = (company: OurRegistration, party: Party) =>
-  saleTax(company, { treatment: party.treatment, stateCode: party.placeOfSupply, exportRoute: party.exportRoute });
+  saleTax(company, { treatment: party.treatment, stateCode: party.placeOfSupply });
 
 const money = (value: number) => Math.round(value * 100) / 100;
 
@@ -76,7 +76,7 @@ export const quotationNumber = (financialYear: string, sequence: number) =>
 
 export const DEFAULT_TERMS = [
   "Rates are for delivery at our yard unless stated.",
-  "GST extra as applicable. Exports to Bhutan under LUT where the buyer qualifies.",
+  "GST extra as applicable.",
   "Prices hold till the validity date; steel rates are subject to change after that.",
   "Payment as per agreed credit terms.",
 ].join("\n");

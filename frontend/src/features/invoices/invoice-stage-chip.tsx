@@ -5,8 +5,6 @@ const TONE: Record<InvoiceStage, StatusTone> = {
   Draft: "neutral",
   Issued: "brand",
   Dispatched: "brand",
-  "Cleared customs": "warning",
-  "Payment realised": "success",
   Cancelled: "danger",
 };
 

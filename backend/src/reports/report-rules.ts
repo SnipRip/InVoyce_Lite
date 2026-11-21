@@ -1,7 +1,7 @@
 // Pure pieces of the reports (SOW 16): which screen each report's data comes
 // from, the period, and the sums and labels the rows are built with.
 import { STATE_NAMES } from '../common/gst/state-names.js';
-import type { QuotationStatus, ShipmentStage } from '../generated/prisma/enums.js';
+import type { QuotationStatus } from '../generated/prisma/enums.js';
 import { EXPENSES_MODULE } from '../expenses/expenses.controller.js';
 import { INVOICES_MODULE } from '../invoices/invoices.controller.js';
 import { ITEMS_MODULE } from '../items/items-module-key.js';
@@ -9,8 +9,6 @@ import { PROFIT_MODULE } from '../profit/profit.controller.js';
 import { PURCHASE_BILLS_MODULE } from '../purchases/purchases.controllers.js';
 import { QUOTATIONS_MODULE } from '../quotations/quotations.controller.js';
 import { PAYMENTS_MODULE } from '../settlements/settlements.controller.js';
-import { STAGE_NAMES } from '../shipments/shipment-rules.js';
-import { SHIPMENTS_MODULE } from '../shipments/shipments.controller.js';
 
 export const REPORTS_MODULE = '/reports';
 
@@ -29,8 +27,6 @@ export const REPORT_SOURCES = {
   'stock-summary': [ITEMS_MODULE],
   expenses: [EXPENSES_MODULE],
   outstanding: [PAYMENTS_MODULE],
-  shipments: [SHIPMENTS_MODULE, PROFIT_MODULE],
-  'export-register': [INVOICES_MODULE],
   // Sold slices against the batches they came from: sales, purchases and profit.
   'item-profit': [INVOICES_MODULE, PURCHASE_BILLS_MODULE, PROFIT_MODULE],
   // Credit notes (sales side) and debit notes (purchase side), for GSTR-1 9B and the books.
@@ -69,12 +65,8 @@ const QUOTATION_STAGES: Record<QuotationStatus, string> = {
 
 export const quotationStage = (status: QuotationStatus) => QUOTATION_STAGES[status];
 
-/** "On the way", "Customs cleared": the stage names with a capital. */
-export const shipmentStage = (stage: ShipmentStage) => STAGE_NAMES[stage].charAt(0).toUpperCase() + STAGE_NAMES[stage].slice(1);
-
-/** Where a sale is reported: the state of supply, or the export country. */
-export const placeLabel = (invoice: { kind: 'LOCAL' | 'EXPORT'; placeOfSupply: string | null; destinationCountry: string | null }) =>
-  invoice.kind === 'EXPORT' ? `Export · ${invoice.destinationCountry ?? 'Bhutan'}` : ((invoice.placeOfSupply && STATE_NAMES[invoice.placeOfSupply]) ?? 'Unknown');
+/** Where a sale is reported: the state of supply. */
+export const placeLabel = (invoice: { placeOfSupply: string | null }) => (invoice.placeOfSupply && STATE_NAMES[invoice.placeOfSupply]) ?? 'Unknown';
 
 /** As the dashboard's low-stock card: nothing left, at or below the reorder level, or fine. */
 export function stockStatus(stock: number, reorderLevel: number) {
@@ -106,10 +98,10 @@ const addHeads = (rows: TaxHeads[]): TaxHeads => ({ cgst: sumOf(rows, (row) => r
 /**
  * The 3B view: output tax on sales, reverse charge to pay in cash, input
  * credit (the claimable GST on every bill, reverse charge included once it is
- * paid, and on expenses), what is left after credit (before the set-off
- * order), and the zero-rated LUT exports.
+ * paid, and on expenses) and what is left after credit (before the set-off
+ * order).
  */
-export function gstSummaryRows(sales: TaxHeads[], bills: BillTax[], expenseCredit: TaxHeads[], lutExportValue: number): ReportRow[] {
+export function gstSummaryRows(sales: TaxHeads[], bills: BillTax[], expenseCredit: TaxHeads[]): ReportRow[] {
   const output = addHeads(sales);
   const reverse = addHeads(bills.filter((bill) => bill.reverseCharge));
   const credit = addHeads([...bills.map(claimableHeads), ...expenseCredit]);
@@ -119,7 +111,6 @@ export function gstSummaryRows(sales: TaxHeads[], bills: BillTax[], expenseCredi
     { line: 'Reverse charge payable (paid in cash)', ...reverse },
     { line: 'Input credit on bills and expenses', ...credit },
     { line: 'Net after credit, before set-off rules', cgst: net('cgst'), sgst: net('sgst'), igst: net('igst') },
-    { line: 'Exports under LUT (zero-rated value)', cgst: 0, sgst: 0, igst: paise(lutExportValue) },
   ];
 }
 

@@ -16,7 +16,6 @@ type View = Exclude<ProfitRowKind, "creditNote">;
 
 const VIEWS: { value: View; label: string; first: string }[] = [
   { value: "invoice", label: "By invoice", first: "Invoice" },
-  { value: "shipment", label: "By shipment", first: "Shipment" },
   { value: "customer", label: "By customer", first: "Customer" },
   { value: "item", label: "By item", first: "Item" },
 ];
@@ -25,21 +24,19 @@ type SortKey = "profit" | "marginPct" | "sales";
 
 const ROWS: Record<View, (report: ProfitReportView) => ProfitRowView[]> = {
   invoice: (report) => report.byInvoice,
-  shipment: (report) => report.byShipment,
   customer: (report) => report.byCustomer,
   item: (report) => report.byItem,
 };
 
-// Actual profit (SOW 15): sales value less purchase cost less the expenses
+// Actual profit: sales value less purchase cost less the expenses
 // allocated to each sale, all before GST. Overheads come off once, at the end.
 export function ProfitWorkspace({ report }: { report: ProfitReportView }) {
   const [view, setView] = useState<View>("invoice");
   const [sort, setSort] = useState<SortKey>("profit");
-  const { total, overheads, unassigned, otherIncome, otherExpenses, netProfit: net } = report;
-  // "Not on a truck" stays last whatever the sort.
-  const visible = [...ROWS[view](report)].sort((a, b) => Number(!a.kind) - Number(!b.kind) || b[sort] - a[sort]);
+  const { total, overheads, otherIncome, otherExpenses, netProfit: net } = report;
+  const visible = [...ROWS[view](report)].sort((a, b) => b[sort] - a[sort]);
   const widest = Math.max(...visible.map((row) => Math.abs(row.profit)), 1);
-  const offSales = overheads.total + unassigned.total + otherExpenses;
+  const offSales = overheads.total + otherExpenses;
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -131,19 +128,6 @@ export function ProfitWorkspace({ report }: { report: ProfitReportView }) {
                 <td className="text-right font-semibold">{formatInr(row.amount)}</td>
               </tr>
             ))}
-            {unassigned.count > 0 && (
-              <tr>
-                <td>
-                  <Link href="/expenses" className="font-semibold hover:text-brand hover:underline">
-                    Shipment expenses not linked to a truck
-                  </Link>
-                  <div className="text-xs text-muted">
-                    {unassigned.count} expense{unassigned.count === 1 ? "" : "s"}: link them from the shipment page to count them on its sales
-                  </div>
-                </td>
-                <td className="text-right font-semibold">{formatInr(unassigned.total)}</td>
-              </tr>
-            )}
             {otherExpenses !== 0 && (
               <tr>
                 <td>
@@ -188,8 +172,8 @@ export function ProfitWorkspace({ report }: { report: ProfitReportView }) {
           <li>Sales are the invoice value before GST; GST never counts as income or cost.</li>
           <li>Purchase cost is the landed cost of the batches each invoice drew, first in, first out: freight, unloading and other expenses booked on a purchase&rsquo;s items are already inside it, so they are not counted again.</li>
           <li>Expenses are counted at their cost: the amount plus any GST that cannot be claimed.</li>
-          <li>Expenses booked on a shipment are shared over every invoice on the truck by value; those on an invoice over its items the same way. A truck whose invoices fall in two periods splits its expenses between them.</li>
-          <li>Rent, salary and other overheads, and shipment expenses not yet linked to a truck, come off once, as net profit. Only issued invoices count.</li>
+          <li>Expenses booked on an invoice are shared over its items by value.</li>
+          <li>Rent, salary and other overheads come off once, as net profit. Only issued invoices count.</li>
           <li>Indirect expenses and incomes booked outside the expense register (loan interest, bank charges, stock written off or found, overhead bills, journals) come from the books, so net profit agrees with them.</li>
         </ul>
       </GlassCard>

@@ -198,7 +198,7 @@ export function InvoiceDetail({ initialInvoice, party: customer, issuer, bank, o
             )}
           </dl>
           <p className="text-xs font-semibold text-muted">
-            {party.displayName} · {invoice.kind === "export" ? `Export to ${invoice.destinationCountry ?? "abroad"}` : "Local sale"}
+            {party.displayName}
             {stored?.quotation && (
               <>
                 {" · from "}
@@ -252,7 +252,7 @@ export function InvoiceDetail({ initialInvoice, party: customer, issuer, bank, o
           <DispatchDocumentsPanel
             invoice={invoice}
             grandTotal={totals.grandTotal}
-            einvoice={needsEinvoice(invoice, party, issuedAs)}
+            einvoice={needsEinvoice(party, issuedAs)}
             onSave={async (kind, document) => keep(await saveInvoiceDocument(invoice.id, kind, document))}
             onRemove={async (kind) => keep(await removeInvoiceDocument(invoice.id, kind))}
             onFilesChanged={onChanged}

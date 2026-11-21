@@ -106,7 +106,7 @@ export class QuotationsService {
     if (dto.validUntil < dto.date) throw new BadRequestException('Valid till is before the quotation date');
     const party = await tx.party.findUnique({
       where: { id: dto.partyId },
-      select: { isCustomer: true, isArchived: true, treatment: true, placeOfSupply: true, exportRoute: true },
+      select: { isCustomer: true, isArchived: true, treatment: true, placeOfSupply: true },
     });
     if (!party?.isCustomer) throw new BadRequestException('Pick a customer');
     if (party.isArchived) throw new BadRequestException('This customer is archived');

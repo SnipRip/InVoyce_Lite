@@ -15,7 +15,7 @@ const COPIES = ["Original for consignee", "Duplicate for transporter", "Triplica
 
 export function ChallanDocument({ challan, party, issuer }: { challan: ChallanView; party: Party | undefined; issuer: Issuer }) {
   const deliverTo = challan.shipToLine || challan.shipToCity ? [challan.shipToLine, challan.shipToCity].filter(Boolean).join(", ") : null;
-  const placeOfSupply = party?.billing.country ?? (party?.billing.stateCode ? `${stateName(party.billing.stateCode)} (${party.billing.stateCode})` : null);
+  const placeOfSupply = party?.billing.stateCode ? `${stateName(party.billing.stateCode)} (${party.billing.stateCode})` : null;
   return (
     <article className={`print-area ${PAPER}`}>
       {COPIES.map((copy, index) => (

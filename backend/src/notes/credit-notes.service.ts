@@ -8,7 +8,6 @@ import { liveGodown } from '../purchases/purchase-context.js';
 import { settledOf } from '../settlements/settlements.service.js';
 import { lockUntouchedBatches } from '../stock-moves/stock-move-draws.js';
 import type { CreateCreditNoteDto } from './dto/note.dto.js';
-import { customerOwes } from '../invoices/invoice-rules.js';
 import { creditNotePartyAmount } from './note-credit.js';
 import { noteDateProblem, noteLineFigures, noteTotals, settleOnDocument, splitOf, withoutGstProblem, type NoteLineFigures } from './note-rules.js';
 import { creditUsedElsewhere } from './note-allocations.service.js';
@@ -115,8 +114,8 @@ export class CreditNotesService {
         const totals = noteTotals(figures);
         // The note settles the invoice up to what is still due on it; the rest is the customer's credit (note-credit.ts).
         const paid = (await settledOf(tx, [{ kind: 'INVOICE', id: dto.invoiceId }])).get(dto.invoiceId) ?? 0;
-        const stillDue = Math.round((customerOwes({ regime: invoice.regime, total: n(invoice.total), igst: n(invoice.igst) }) - paid) * 100) / 100;
-        const { onDocument } = settleOnDocument(creditNotePartyAmount({ regime: invoice.regime, total: totals.total, igst: totals.igst }), stillDue);
+        const stillDue = Math.round((n(invoice.total) - paid) * 100) / 100;
+        const { onDocument } = settleOnDocument(creditNotePartyAmount({ total: totals.total }), stillDue);
 
         const claimed = await this.numbers.issue(tx, 'CREDIT_NOTE', dto.date, { typed: dto.number ?? undefined });
         const note = await tx.creditNote.create({

@@ -57,8 +57,8 @@ export const vehicleFields = (transporterOptions: { value: string; label: string
   { key: "notes", label: "Notes", kind: "text", wide: true },
 ];
 
-// Vehicle master (real): own trucks and transporters' trucks. The shipment
-// form picks from it and fills the transporter and driver.
+// Vehicle master (real): own trucks and transporters' trucks. Invoices and
+// stock transfers pick from it.
 export function VehiclesMaster() {
   const vehicles = useSWR<VehicleView[]>(withArchived(VEHICLES_PATH), apiGet);
   const vendors = useSWR<PartyView[]>(VENDORS_PATH, apiGet);
@@ -84,7 +84,7 @@ export function VehiclesMaster() {
         { label: "Capacity", render: (vehicle) => (vehicle.capacityTons ? `${formatQuantity(vehicle.capacityTons)} t` : "–"), align: "right" },
         { label: "Owner", render: (vehicle) => (vehicle.ownership === "own" ? <StatusChip tone="brand">Own</StatusChip> : (vehicle.transporterName ?? "Hired")) },
         { label: "Driver", render: (vehicle) => [vehicle.driverName, vehicle.driverPhone].filter(Boolean).join(" · ") || "–" },
-        { label: "Shipments", render: (vehicle) => formatQuantity(vehicle.shipmentCount ?? 0), align: "right" },
+        { label: "Used on", render: (vehicle) => formatQuantity(vehicle.useCount ?? 0), align: "right" },
       ]}
       searchText={(vehicle) => `${vehicle.number} ${vehicle.driverName ?? ""} ${vehicle.driverPhone ?? ""} ${vehicle.transporterName ?? ""}`}
       filters={[
@@ -98,7 +98,7 @@ export function VehiclesMaster() {
         { label: "Total capacity", value: `${formatQuantity(list.reduce((sum, vehicle) => sum + (vehicle.capacityTons ?? 0), 0))} t` },
       ]}
       importMaster="vehicles"
-      footnote="Shipments pick from this list and take its transporter and driver. A vehicle that has carried a shipment is archived, not deleted."
+      footnote="Invoices and stock transfers pick from this list. A vehicle already used on one is archived, not deleted."
     />
   );
 }

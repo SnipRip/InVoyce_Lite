@@ -1,19 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { conversionProblem, kindProblem, quantityOut, SERIES_OF } from './invoice-rules.js';
-
-describe('kindProblem', () => {
-  it('keeps exports for buyers abroad and local invoices for India', () => {
-    expect(kindProblem('EXPORT', 'OVERSEAS')).toBeNull();
-    expect(kindProblem('EXPORT', 'SEZ')).toBeNull();
-    expect(kindProblem('EXPORT', 'REGISTERED')).toMatch(/local invoice/);
-    expect(kindProblem('LOCAL', 'REGISTERED')).toBeNull();
-    expect(kindProblem('LOCAL', 'CONSUMER')).toBeNull();
-    expect(kindProblem('LOCAL', 'OVERSEAS')).toMatch(/export invoice/);
-  });
-  it('numbers each kind from its own series', () => {
-    expect(SERIES_OF).toEqual({ LOCAL: 'SALES_INVOICE', EXPORT: 'EXPORT_INVOICE' });
-  });
-});
+import { conversionProblem, quantityOut } from './invoice-rules.js';
 
 describe('conversionProblem', () => {
   it('invoices a sent or accepted quotation once', () => {

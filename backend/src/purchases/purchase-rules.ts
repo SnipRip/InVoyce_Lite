@@ -4,8 +4,7 @@
 //
 // GST is never picked (27 Oct 2026 walkthrough, gst-rules on the frontend):
 // a goods transport agency → reverse charge (we pay, then claim it back);
-// composition or unregistered vendor → no GST, nothing to claim; overseas →
-// IGST at customs; otherwise CGST + SGST in our state, IGST from another.
+// composition or unregistered vendor → no GST, nothing to claim; otherwise CGST + SGST in our state, IGST from another.
 // Freight and loading printed on a goods bill take the rate of the bill's
 // largest line. GST we cannot claim (17(5), composition, unregistered) is
 // part of what the goods cost. When we are a composition dealer or
@@ -63,9 +62,6 @@ function regularBillTax(companyState: string, vendor: VendorTaxFacts, sourceOfSu
     case 'UNREGISTERED':
     case 'CONSUMER':
       return NO_GST;
-    case 'OVERSEAS':
-    case 'SEZ':
-      return { regime: 'IMPORT', itc: true, split: 'INTER' };
     default:
       return split === 'INTRA' ? { regime: 'INTRA_STATE', itc: true, split } : { regime: 'INTER_STATE', itc: true, split };
   }

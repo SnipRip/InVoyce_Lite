@@ -42,9 +42,8 @@ export function PartyBlock({ heading, party, fallbackName }: { heading: string; 
       {party && (
         <>
           {street && <p>{street}</p>}
-          <p>{party.billing.country ?? stateName(party.billing.stateCode)}</p>
+          <p>{stateName(party.billing.stateCode)}</p>
           {party.gstin && <p className="font-semibold">GSTIN {party.gstin}</p>}
-          {party.foreignTaxId && <p className="font-semibold">Tax ID {party.foreignTaxId}</p>}
         </>
       )}
     </div>

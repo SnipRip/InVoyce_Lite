@@ -5,7 +5,7 @@ import type { Party } from "@/features/parties/types";
 import { amountInWords } from "@/lib/amount-in-words";
 import { formatDate, formatQuantity, formatRate } from "@/lib/format";
 import { documentType } from "./dispatch-documents";
-import { exportDeclaration, hsnSummary, invoiceTotals, lineTotals, needsEinvoice } from "./invoice-rules";
+import { hsnSummary, invoiceTotals, lineTotals, needsEinvoice } from "./invoice-rules";
 import type { BankCashAccountView } from "@/types/bank-cash";
 import type { DispatchDocumentKind, Invoice } from "./types";
 
@@ -19,7 +19,6 @@ export interface Issuer {
   /** Company setting carried to the sale forms: lines keep their HSN's GST %. */
   enforceHsnGstRate?: boolean;
   gstin?: string;
-  iec?: string;
 }
 
 interface InvoiceDocumentProps {
@@ -32,21 +31,19 @@ interface InvoiceDocumentProps {
 }
 
 // The printed bill: white paper, not glass, with every particular CGST rule 46
-// asks for. Export invoices swap the buyer's GSTIN for the destination country
-// and carry the LUT or IGST declaration. A composition dealer prints a bill
+// asks for. A composition dealer prints a bill
 // of supply with the rule 5(1)(g) line; an unregistered business, a plain
 // invoice without GSTIN. Neither shows a GST rate, column or amount (rule 49
 // asks for HSN, description and value only). Printed through `.print-area`.
 export function InvoiceDocument({ invoice, party, issuer, tax, bank }: InvoiceDocumentProps) {
-  const isExport = invoice.kind === "export";
   const totals = invoiceTotals(invoice.lines, tax.regime);
   const summary = hsnSummary(invoice.lines, tax.regime);
-  const references: DispatchDocumentKind[] = ["customs-invoice", "lorry-challan", "eway-bill", "shipping-bill", "leo"];
+  const references: DispatchDocumentKind[] = ["lorry-challan", "eway-bill"];
   const shipTo = invoice.shipTo ?? party.billing;
   const einvoice = invoice.documents["e-invoice"];
-  const withGst = chargesGst(issuer) || isExport;
+  const withGst = chargesGst(issuer);
   const composition = issuer.registration === "COMPOSITION";
-  const title = isExport ? "EXPORT INVOICE" : withGst ? "TAX INVOICE" : composition ? "BILL OF SUPPLY" : "INVOICE";
+  const title = withGst ? "TAX INVOICE" : composition ? "BILL OF SUPPLY" : "INVOICE";
 
   return (
     <article className="print-area rounded-(--radius-tile) bg-white p-6 text-[12px] leading-snug text-ink shadow-[0_10px_40px_rgb(20_40_90/0.12)] sm:p-8">
@@ -58,7 +55,6 @@ export function InvoiceDocument({ invoice, party, issuer, tax, bank }: InvoiceDo
           <p className="font-semibold">
             {issuer.registration === "UNREGISTERED" ? "Not registered under GST" : `GSTIN ${issuer.gstin ?? "[to be added]"}`} · State{" "}
             {stateName(issuer.stateCode)} ({issuer.stateCode})
-            {isExport && ` · IEC ${issuer.iec || "[to be added]"}`}
           </p>
         </div>
         <div className="text-right">
@@ -68,11 +64,7 @@ export function InvoiceDocument({ invoice, party, issuer, tax, bank }: InvoiceDo
         </div>
       </header>
 
-      {isExport && (
-        <p className="mt-3 border border-ink px-3 py-2 text-center text-[11px] font-semibold">{exportDeclaration(invoice)}</p>
-      )}
-
-      {needsEinvoice(invoice, party, issuer) && (
+      {needsEinvoice(party, issuer) && (
         <section className="mt-3 flex items-start gap-3 border border-line p-2.5 text-[11px]">
           <div className="flex size-[84px] shrink-0 items-center justify-center border border-dashed border-ink/40 p-1 text-center text-[9px] font-semibold text-muted">
             {einvoice ? "Signed QR from the e-invoice portal" : "QR after e-invoice registration"}
@@ -97,29 +89,20 @@ export function InvoiceDocument({ invoice, party, issuer, tax, bank }: InvoiceDo
           <p className="font-semibold text-muted">Bill to</p>
           <p className="font-semibold">{party.legalName ?? party.displayName}</p>
           <p>{[party.billing.line1, party.billing.city, party.billing.pin].filter(Boolean).join(", ")}</p>
-          <p>{party.billing.country ?? stateName(party.billing.stateCode)}</p>
+          <p>{stateName(party.billing.stateCode)}</p>
           {party.gstin && <p className="font-semibold">GSTIN {party.gstin}</p>}
-          {party.foreignTaxId && <p className="font-semibold">Tax ID {party.foreignTaxId}</p>}
         </div>
         <div>
-          <p className="font-semibold text-muted">{isExport ? "Consignee / deliver to" : "Ship to"}</p>
+          <p className="font-semibold text-muted">Ship to</p>
           <p>{[shipTo.line1, shipTo.city].filter(Boolean).join(", ")}</p>
-          <p>{shipTo.country ?? stateName(shipTo.stateCode)}</p>
+          <p>{stateName(shipTo.stateCode)}</p>
         </div>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3">
           <dt className="font-semibold text-muted">{composition ? "Bill no." : "Invoice no."}</dt>
           <dd className="font-semibold">{invoice.number}</dd>
           <dt className="font-semibold text-muted">Date</dt>
           <dd>{formatDate(invoice.date)}</dd>
-          {isExport ? (
-            <>
-              <dt className="font-semibold text-muted">Destination</dt>
-              <dd>{invoice.destinationCountry}</dd>
-              <dt className="font-semibold text-muted">Currency</dt>
-              <dd>{invoice.currency}</dd>
-            </>
-          ) : (
-            <>
+          <>
               <dt className="font-semibold text-muted">Place of supply</dt>
               <dd>
                 {stateName(invoice.placeOfSupply)} ({invoice.placeOfSupply})
@@ -130,8 +113,7 @@ export function InvoiceDocument({ invoice, party, issuer, tax, bank }: InvoiceDo
                   <dd>No</dd>
                 </>
               )}
-            </>
-          )}
+          </>
           {invoice.vehicleNumber && (
             <>
               <dt className="font-semibold text-muted">Vehicle</dt>
@@ -203,7 +185,7 @@ export function InvoiceDocument({ invoice, party, issuer, tax, bank }: InvoiceDo
                 {summary.map((row) => (
                   <tr key={`${row.hsn}-${row.ratePct}`}>
                     <td className="py-0.5 text-left">{row.hsn}</td>
-                    {withGst && <td className="py-0.5">{tax.regime === "export-lut" ? "0% (LUT)" : `${row.ratePct}%`}</td>}
+                    {withGst && <td className="py-0.5">{`${row.ratePct}%`}</td>}
                     <td className="py-0.5">{formatRate(row.taxable)}</td>
                     {withGst && <td className="py-0.5">{formatRate(row.tax)}</td>}
                   </tr>
@@ -213,7 +195,7 @@ export function InvoiceDocument({ invoice, party, issuer, tax, bank }: InvoiceDo
           )}
           <p>
             <span className="font-semibold">Amount in words: </span>
-            {amountInWords(totals.grandTotal, invoice.currency)}
+            {amountInWords(totals.grandTotal)}
           </p>
           {invoice.notes && <p>{invoice.notes}</p>}
         </div>
@@ -235,7 +217,7 @@ export function InvoiceDocument({ invoice, party, issuer, tax, bank }: InvoiceDo
             </div>
           )}
           <div className="mt-1 flex justify-between border-t-2 border-ink pt-1 text-[14px] font-semibold">
-            <dt>Total ({invoice.currency})</dt>
+            <dt>Total (INR)</dt>
             <dd>{formatRate(totals.grandTotal)}</dd>
           </div>
         </dl>
@@ -249,10 +231,6 @@ export function InvoiceDocument({ invoice, party, issuer, tax, bank }: InvoiceDo
             .map((kind) => `${documentType(kind).name} ${invoice.documents[kind]!.number}`)
             .join(" · ")}
         </section>
-      )}
-
-      {isExport && (
-        <p className="mt-3 text-[11px] font-semibold">Payment: please quote invoice number {invoice.number} in the payment remarks.</p>
       )}
 
       {bank && (

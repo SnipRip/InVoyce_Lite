@@ -1,11 +1,8 @@
 // A note's credit with the party (client, 13 Nov 2026): what the note takes
 // off the party, less what it settled (its own document first, then any
-// other document it was applied to) and what live refunds gave back. A credit
-// note on an export with IGST takes off the goods value only: the IGST part
-// went to IGST Refund Receivable, never to the customer (invoice-postings.ts).
+// other document it was applied to) and what live refunds gave back.
 import type { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
-import { customerOwes } from '../invoices/invoice-rules.js';
 
 type Db = Prisma.TransactionClient | PrismaService;
 
@@ -16,8 +13,7 @@ const money = (value: number) => Math.round(value * 100) / 100;
 const num = (value: Prisma.Decimal | number | null) => (value === null ? 0 : typeof value === 'number' ? value : value.toNumber());
 
 /** What a credit note takes off what the customer owes. */
-export const creditNotePartyAmount = (note: { regime: Parameters<typeof customerOwes>[0]['regime']; total: Prisma.Decimal | number; igst: Prisma.Decimal | number }) =>
-  customerOwes({ regime: note.regime, total: num(note.total), igst: num(note.igst) });
+export const creditNotePartyAmount = (note: { total: Prisma.Decimal | number }) => money(num(note.total));
 
 /** What a debit note takes off what we owe the vendor. */
 export const debitNotePartyAmount = (note: { total: Prisma.Decimal | number }) => money(num(note.total));

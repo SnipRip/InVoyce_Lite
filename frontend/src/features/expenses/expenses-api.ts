@@ -14,12 +14,12 @@ export const EXPENSES_PATH = "/expenses";
 export const expensePath = (id: string) => `${EXPENSES_PATH}/${id}`;
 export const expenseNumberPreviewPath = (date: string) => `/number-series/preview?kind=EXPENSE&date=${date}`;
 
-export const TO_BACKEND: Record<HeadAllocation, ExpenseAllocationView> = { "item-cost": "ITEM_COST", invoice: "INVOICE", shipment: "SHIPMENT", overhead: "OVERHEAD" };
-export const FROM_BACKEND: Record<ExpenseAllocationView, HeadAllocation> = { ITEM_COST: "item-cost", INVOICE: "invoice", SHIPMENT: "shipment", OVERHEAD: "overhead" };
+export const TO_BACKEND: Record<HeadAllocation, ExpenseAllocationView> = { "item-cost": "ITEM_COST", invoice: "INVOICE", overhead: "OVERHEAD" };
+export const FROM_BACKEND: Record<ExpenseAllocationView, HeadAllocation> = { ITEM_COST: "item-cost", INVOICE: "invoice", OVERHEAD: "overhead" };
 
 /** Where the cost's target opens in the app. */
 export const targetHref = (target: NonNullable<ExpenseView["target"]>) =>
-  target.kind === "BILL" ? `/purchases/${target.id}` : target.kind === "INVOICE" ? `/invoices/${target.id}` : `/shipments/${target.id}`;
+  target.kind === "BILL" ? `/purchases/${target.id}` : `/invoices/${target.id}`;
 
 const money = (value: number) => Math.round(value * 100) / 100;
 
@@ -41,11 +41,7 @@ export function expenseDecision(company: OurRegistration | undefined, vendor: Pa
 
 /** Why the vendor's bill does not go through Expenses (the backend refuses the same). */
 export const decisionProblem = (decision: TaxDecision) =>
-  decision.regime === "reverse-charge"
-    ? "A goods transport agency bills under reverse charge: enter it as a freight bill in Purchases."
-    : decision.regime === "import"
-      ? "A bill from an overseas or SEZ vendor goes through Purchases."
-      : null;
+  decision.regime === "reverse-charge" ? "A goods transport agency bills under reverse charge: enter it as a freight bill in Purchases." : null;
 
 export interface ExpensePreview {
   /** A fixed rate (head or vendor decides), else the rates to pick from. */

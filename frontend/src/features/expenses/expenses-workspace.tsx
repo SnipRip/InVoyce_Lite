@@ -22,7 +22,7 @@ const money = (value: number) => Math.round(value * 100) / 100;
 const sumCost = (expenses: ExpenseView[]) => money(expenses.reduce((sum, expense) => sum + expense.cost, 0));
 
 // Every expense with where its cost lands: on a purchase's items (landed
-// cost), one invoice, one shipment, or general overhead. Cancelled ones are
+// cost), one invoice, or general overhead. Cancelled ones are
 // struck through and count nowhere.
 export function ExpensesWorkspace({ expenses }: { expenses: ExpenseView[] }) {
   const [filter, setFilter] = useState<HeadAllocation | "owed" | "all">("all");
@@ -42,7 +42,7 @@ export function ExpensesWorkspace({ expenses }: { expenses: ExpenseView[] }) {
       <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
         <StatTile label="Cost, before claimable GST" value={formatInr(sumCost(live))} />
         <StatTile label="Landed on items" value={formatInr(byKind("item-cost"))} />
-        <StatTile label="On invoices and shipments" value={formatInr(byKind("invoice") + byKind("shipment"))} />
+        <StatTile label="On invoices" value={formatInr(byKind("invoice"))} />
         <StatTile label="Still owed to vendors" value={formatInr(owed)} />
       </div>
 

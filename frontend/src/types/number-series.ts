@@ -4,7 +4,6 @@
 export type NumberedKind =
   | "QUOTATION"
   | "SALES_INVOICE"
-  | "EXPORT_INVOICE"
   | "PURCHASE_ORDER"
   | "PURCHASE"
   | "RECEIPT"
@@ -15,7 +14,6 @@ export type NumberedKind =
   | "STOCK_JOURNAL"
   | "STOCK_TRANSFER"
   | "DELIVERY_CHALLAN"
-  | "SHIPMENT"
   | "EXPENSE"
   | "CUSTOMER_CODE"
   | "VENDOR_CODE"

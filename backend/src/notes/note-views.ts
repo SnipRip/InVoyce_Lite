@@ -100,7 +100,7 @@ interface NoteViewBase {
   cancelReason: string | null;
   createdBy: string | null;
   lines: NoteLineView[];
-  /** What the note takes off the party (a credit note on an export with IGST: the goods value only). */
+  /** What the note takes off the party. */
   partyAmount: number;
   /** What it settles: its own document first, then any it was applied to later. */
   settles: NoteSettlementView[];

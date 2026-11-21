@@ -11,7 +11,6 @@ export interface CompanyProfileView {
   pan: string | null;
   /** GST state code of our registration, e.g. "19". */
   stateCode: string;
-  iec: string | null;
   addressLine: string | null;
   city: string | null;
   district: string | null;
@@ -19,11 +18,6 @@ export interface CompanyProfileView {
   phone: string | null;
   altPhone: string | null;
   email: string | null;
-  exportBank: string | null;
-  customsStation: string | null;
-  portCode: string | null;
-  defaultExportRoute: "LUT" | "IGST";
-  exportCurrency: "INR" | "BTN";
   /** On: document lines take only their HSN's GST %; off: the HSN rate is filled in and can be changed. */
   enforceHsnGstRate: boolean;
   updatedAt: string;

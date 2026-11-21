@@ -16,8 +16,4 @@ export interface TransporterView {
   isArchived: boolean;
   /** Live vehicles on the vehicle master. */
   vehicleCount: number;
-  /** Shipments carried, cancelled ones left out. */
-  shipmentCount: number;
-  /** YYYY-MM-DD. */
-  lastShipmentDate: string | null;
 }

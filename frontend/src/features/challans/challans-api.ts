@@ -40,4 +40,4 @@ export function heldOnChallans(challans: ChallanView[], godownId: string, except
 }
 
 /** Where an invoice raised from the challan is made: export for a buyer outside India. */
-export const invoiceFromChallanHref = (challan: ChallanView, overseas: boolean) => `/invoices/new/${overseas ? "export" : "local"}?challan=${challan.id}${challan.quotation ? `&quotation=${challan.quotation.id}` : ""}`;
+export const invoiceFromChallanHref = (challan: ChallanView) => `/invoices/new?challan=${challan.id}${challan.quotation ? `&quotation=${challan.quotation.id}` : ""}`;

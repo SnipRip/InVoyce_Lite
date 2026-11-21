@@ -1,7 +1,7 @@
 // The dashboard summary as the API returns it (GET /dashboard). A section is
 // null when the user's role may not see the screen it comes from, so the
 // card for it is left out rather than showing figures they cannot open.
-import type { DispatchDocumentKind, QuotationStatus, SettlementDirection, ShipmentStage } from '../generated/prisma/enums.js';
+import type { DispatchDocumentKind, QuotationStatus, SettlementDirection } from '../generated/prisma/enums.js';
 import type { TargetKind } from '../settlements/settlement-rules.js';
 
 export interface DashboardView {
@@ -10,7 +10,7 @@ export interface DashboardView {
   to: string;
   /** Mondays of the chart's weeks, oldest first; each series below has one figure per week. */
   weeks: string[];
-  sales: { total: number; invoices: number; exportInvoices: number; byWeek: number[] } | null;
+  sales: { total: number; invoices: number; byWeek: number[] } | null;
   purchases: { total: number; bills: number; vendors: number; byWeek: number[]; untaggedCharges: number } | null;
   profit: {
     sales: number;
@@ -36,11 +36,7 @@ export interface DashboardView {
      */
     dues: { direction: SettlementDirection; kind: TargetKind; id: string; partyId: string; partyName: string; number: string; balance: number; dueDate: string }[];
   } | null;
-  documents: { missing: number; holdingTrucks: number; first: { kind: DispatchDocumentKind; invoiceNumber: string }[] } | null;
+  documents: { missing: number; first: { kind: DispatchDocumentKind; invoiceNumber: string }[] } | null;
   stock: { low: number; first: string[] } | null;
   quotations: { id: string; number: string; revision: number; partyName: string; total: number; validUntil: string; status: QuotationStatus }[] | null;
-  shipments: {
-    counts: { planned: number; onTheRoad: number; done: number };
-    latest: { id: string; number: string; vehicleNumber: string; stage: ShipmentStage; partyName: string; nextStage: ShipmentStage | null; waitingFor: DispatchDocumentKind[] }[];
-  } | null;
 }

@@ -2,8 +2,7 @@
 // voucher turned round, for the part it takes back. Pure.
 //   Credit note (sales return, s.34(1)):  Dr Sales Returns (one ledger for
 //     every regime, client 13 Nov 2026; gross sales stay as invoiced),
-//     Dr Output CGST + SGST / IGST           Cr customer (and IGST Refund
-//     Receivable on an export with IGST, as the invoice debited it).
+//     Dr Output CGST + SGST / IGST           Cr customer.
 //   Debit note (purchase return, s.34(3)): Dr vendor   Cr the bill's purchase
 //     ledger (No Input Credit for lines whose GST was cost), Cr Input GST
 //     (the credit given back).

@@ -14,7 +14,7 @@ export const settlementInclude = {
   allocations: {
     orderBy: { createdAt: 'asc' },
     include: {
-      invoice: { select: { number: true, kind: true } },
+      invoice: { select: { number: true } },
       bill: { select: { reference: true, vendorBillNumber: true } },
       expense: { select: { number: true } },
       advance: { select: { number: true, date: true } },
@@ -73,7 +73,6 @@ export const toSettlementView = (row: SettlementRow) => {
     amount,
     tds,
     reference: row.reference,
-    brc: row.brcNumber && row.brcDate ? { number: row.brcNumber, date: isoDate(row.brcDate) } : null,
     notes: row.notes,
     allocations,
     applied,
@@ -108,8 +107,8 @@ export interface OpenDocumentView {
   settled: number;
   balance: number;
   ageBucket: AgeBucket;
-  /** Export invoice (BRC on receipt) or MSME vendor bill (45-day rule). */
-  flag: 'EXPORT' | 'MSME' | null;
+  /** MSME vendor bill (45-day rule). */
+  flag: 'MSME' | null;
   /** JOURNAL rows: the journal the charging line is on. */
   journalId?: string;
 }

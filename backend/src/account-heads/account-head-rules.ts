@@ -66,7 +66,7 @@ export function headProblem(head: HeadFacts): string | null {
     return 'Only a head with its own GST rate carries a rate';
   }
   if (head.nature === HeadNature.INDIRECT_EXPENSE && head.allocation !== HeadAllocation.OVERHEAD) {
-    return 'An indirect expense is a general overhead; make the head direct to tie it to a purchase, invoice or shipment';
+    return 'An indirect expense is a general overhead; make the head direct to tie it to a purchase or invoice';
   }
   return null;
 }

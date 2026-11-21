@@ -16,26 +16,12 @@ import { PURCHASE_BILLS_MODULE } from '../purchases/purchases.controllers.js';
 import { QUOTATIONS_MODULE } from '../quotations/quotations.controller.js';
 import { PAYMENTS_MODULE } from '../settlements/settlements.controller.js';
 import { SettlementsService } from '../settlements/settlements.service.js';
-import { SHIPMENTS_MODULE } from '../shipments/shipments.controller.js';
-import { carried, shipmentInclude } from '../shipments/shipment-views.js';
-import { missingFor, nextStage } from '../shipments/shipment-rules.js';
-import type { ShipmentStage } from '../generated/prisma/enums.js';
 import { recentWeeks, sumByWeek } from './dashboard-rules.js';
 import type { DashboardView } from './dashboard-views.js';
 
 /** How many names a card lists before "and N more". */
 const FIRST = 3;
 const PENDING_QUOTATIONS = 8;
-const LATEST_SHIPMENTS = 4;
-
-const STAGE_GROUP: Record<ShipmentStage, keyof NonNullable<DashboardView['shipments']>['counts']> = {
-  PLANNED: 'planned',
-  LOADING: 'planned',
-  IN_TRANSIT: 'onTheRoad',
-  AT_BORDER: 'onTheRoad',
-  CLEARED: 'done',
-  DELIVERED: 'done',
-};
 
 const sum = (values: number[]) => Math.round(values.reduce((total, value) => total + value, 0) * 100) / 100;
 
@@ -60,7 +46,7 @@ export class DashboardService {
     const may = (module: string) => canAccess(auth, module, 'view');
     const when = <T>(module: string, load: () => Promise<T>) => (may(module) ? load() : Promise.resolve(null));
 
-    const [sales, purchases, profit, outstanding, documents, stock, quotations, shipments] = await Promise.all([
+    const [sales, purchases, profit, outstanding, documents, stock, quotations] = await Promise.all([
       when(INVOICES_MODULE, () => this.sales(from, to, weeks)),
       when(PURCHASE_BILLS_MODULE, () => this.purchases(from, to, weeks)),
       when(PROFIT_MODULE, () => this.profit(from, to, weeks)),
@@ -68,21 +54,19 @@ export class DashboardService {
       when(DOCUMENTS_MODULE, () => this.documents()),
       when(ITEMS_MODULE, () => this.stock()),
       when(QUOTATIONS_MODULE, () => this.quotations()),
-      when(SHIPMENTS_MODULE, () => this.shipments()),
     ]);
-    return { from, to, weeks, sales, purchases, profit, outstanding, documents, stock, quotations, shipments };
+    return { from, to, weeks, sales, purchases, profit, outstanding, documents, stock, quotations };
   }
 
   private async sales(from: string, to: string, weeks: string[]): Promise<DashboardView['sales']> {
     const rows = await this.prisma.invoice.findMany({
       where: { status: 'ISSUED', date: { gte: dateOnly(from), lte: dateOnly(to) } },
-      select: { date: true, kind: true, taxable: true },
+      select: { date: true, taxable: true },
     });
     const amounts = rows.map((row) => ({ date: isoDate(row.date), amount: toNumber(row.taxable) }));
     return {
       total: sum(amounts.map((row) => row.amount)),
       invoices: rows.length,
-      exportInvoices: rows.filter((row) => row.kind === 'EXPORT').length,
       byWeek: sumByWeek(weeks, amounts),
     };
   }
@@ -157,7 +141,6 @@ export class DashboardService {
     const { missing } = await this.register.register();
     return {
       missing: missing.length,
-      holdingTrucks: missing.filter((paper) => paper.holdsTruck).length,
       first: missing.slice(0, FIRST).map((paper) => ({ kind: paper.kind, invoiceNumber: paper.invoice.number })),
     };
   }
@@ -195,35 +178,5 @@ export class DashboardService {
       validUntil: isoDate(row.validUntil),
       status: row.status,
     }));
-  }
-
-  /** Live trucks by stage group, and the latest few with the papers holding each up. */
-  private async shipments(): Promise<DashboardView['shipments']> {
-    const [byStage, latest] = await Promise.all([
-      this.prisma.shipment.groupBy({ by: ['stage'], where: { cancelledAt: null }, _count: { _all: true } }),
-      this.prisma.shipment.findMany({
-        where: { cancelledAt: null },
-        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-        take: LATEST_SHIPMENTS,
-        include: shipmentInclude,
-      }),
-    ]);
-    const counts = { planned: 0, onTheRoad: 0, done: 0 };
-    for (const row of byStage) counts[STAGE_GROUP[row.stage]] += row._count._all;
-    return {
-      counts,
-      latest: latest.map((row) => {
-        const next = nextStage(row.stage);
-        return {
-          id: row.id,
-          number: row.number,
-          vehicleNumber: row.vehicleNumber,
-          stage: row.stage,
-          partyName: row.party.displayName,
-          nextStage: next,
-          waitingFor: next ? [...new Set(missingFor(next, carried(row)).map((paper) => paper.kind))] : [],
-        };
-      }),
-    };
   }
 }

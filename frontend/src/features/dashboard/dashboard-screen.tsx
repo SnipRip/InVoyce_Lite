@@ -8,10 +8,9 @@ import { apiGet } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
 import type { DashboardView } from "@/types/dashboard";
 import { AttentionList } from "./attention-list";
-import { attentionItems, dashboardKpis, pendingQuotations, shipmentSummary, tradingWeeks } from "./dashboard-cards";
+import { attentionItems, dashboardKpis, pendingQuotations, tradingWeeks } from "./dashboard-cards";
 import { KpiCards } from "./kpi-cards";
 import { PendingQuotationsTable } from "./pending-quotations-table";
-import { ShipmentsCard } from "./shipments-card";
 import { TradingChart } from "./trading-chart";
 
 export const DASHBOARD_PATH = "/dashboard";
@@ -31,7 +30,6 @@ export function DashboardScreen() {
   const dues = data.outstanding?.dues ?? [];
   const showChart = chart.series.length > 0;
   const showAttention = attention.length > 0 || dues.length > 0;
-  const shipments = data.shipments && shipmentSummary(data.shipments);
 
   return (
     <>
@@ -47,12 +45,7 @@ export function DashboardScreen() {
           {showAttention && <AttentionList items={attention} dues={dues} />}
         </div>
       )}
-      {(data.quotations || shipments) && (
-        <div className={row(!!data.quotations && !!shipments)}>
-          {data.quotations && <PendingQuotationsTable quotations={pendingQuotations(data)} />}
-          {shipments && <ShipmentsCard counts={shipments.counts} shipments={shipments.rows} />}
-        </div>
-      )}
+      {data.quotations && <PendingQuotationsTable quotations={pendingQuotations(data)} />}
     </>
   );
 }

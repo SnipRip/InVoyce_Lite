@@ -4,9 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { dateOnly, isoDate, todayInIndia } from '../common/dates.js';
 import { toNumber } from '../common/decimal.js';
 import { PrismaService } from '../database/prisma.service.js';
-import { customerOwes } from '../invoices/invoice-rules.js';
 import type { Prisma, SettlementDirection } from '../generated/prisma/client.js';
-import type { SaleRegime } from '../generated/prisma/enums.js';
 import { NumberSeriesService } from '../number-series/number-series.service.js';
 import type { AllocationDto, ApplyAdvanceDto, SettlementDto } from './dto/settlement.dto.js';
 import {
@@ -15,7 +13,6 @@ import {
   ageBucket,
   allocationProblem,
   balanceOf,
-  brcProblem,
   cashLimitProblem,
   dateProblem,
   invoiceDueDate,
@@ -39,9 +36,8 @@ type Db = Tx | PrismaService;
 const money = (value: number) => Math.round(value * 100) / 100;
 /** An aggregate's sum, 0 when there were no rows. */
 const sumOf = (value: Prisma.Decimal | null) => (value ? value.toNumber() : 0);
-/** What a customer settles on an invoice (goods value only on an export with IGST paid). */
-const owedOn = (invoice: { regime: SaleRegime; total: Prisma.Decimal; igst: Prisma.Decimal }) =>
-  customerOwes({ regime: invoice.regime, total: toNumber(invoice.total), igst: toNumber(invoice.igst) });
+/** What a customer settles on an invoice. */
+const owedOn = (invoice: { total: Prisma.Decimal }) => toNumber(invoice.total);
 const fail = (message: string | null) => {
   if (message) throw new BadRequestException(message);
 };
@@ -56,7 +52,6 @@ interface PartyFacts {
 
 interface Target extends AllocationPlan {
   allocation: AllocationDto;
-  exportInvoice: boolean;
 }
 
 /** Opening balances settle in the direction they run: what customers owe us comes in, what we owe vendors goes out. */
@@ -69,8 +64,7 @@ const SERIES = { RECEIPT: 'RECEIPT', PAYMENT: 'PAYMENT' } as const;
 // of the same opening balance, cannot cross), then each invoice or bill it is
 // applied to (so a cancel or void, or another settlement, waits); balances
 // are worked out from live allocations, the number comes from the RECEIPT or
-// PAYMENT series, and a BRC on an export receipt is attached to each export
-// invoice that has none yet. Never edited: cancel and enter again; what is
+// PAYMENT series. Never edited: cancel and enter again; what is
 // left unapplied can be applied later, or refunded: a refund is an entry of
 // the other direction applied to the advance (kind ADVANCE; settlement-rules.ts).
 // Lock order everywhere: party, then documents / advances in id order.
@@ -109,7 +103,7 @@ export class SettlementsService {
       if (!(dto.amount + tds > 0)) fail('Enter the amount');
       if (refund) {
         const applied = money(dto.allocations.reduce((sum, allocation) => sum + allocation.amount, 0));
-        fail(refundShapeProblem({ kinds: dto.allocations.map((allocation) => allocation.kind), amount: dto.amount, tds, applied, hasBrc: Boolean(dto.brcNumber || dto.brcDate) }));
+        fail(refundShapeProblem({ kinds: dto.allocations.map((allocation) => allocation.kind), amount: dto.amount, tds, applied }));
       }
       if (dto.direction === 'RECEIPT' && dto.mode === 'CASH') {
         // Cash the party paid in that day on receipts and journals (journal-cash.ts).
@@ -118,10 +112,6 @@ export class SettlementsService {
 
       const targets = await this.targets(tx, dto.direction, dto.partyId, party!, dto.allocations);
       fail(allocationProblem(targets, money(dto.amount + tds)));
-
-      const brc = dto.brcNumber || dto.brcDate ? { number: dto.brcNumber ?? '', date: dto.brcDate ?? '' } : null;
-      if (brc && (!brc.number || !brc.date)) fail('Enter both the BRC number and its date');
-      fail(brcProblem(brc, dto.date, today, targets.some((target) => target.exportInvoice)));
 
       const id = randomUUID();
       const issued = await this.numbers.issue(tx, SERIES[dto.direction], dto.date, { typed: dto.number ?? undefined, documentId: id });
@@ -138,32 +128,12 @@ export class SettlementsService {
           amount: dto.amount,
           tds,
           reference: dto.reference ?? null,
-          brcNumber: brc?.number ?? null,
-          brcDate: brc ? dateOnly(brc.date) : null,
           notes: dto.notes ?? null,
           createdById: userId,
           allocations: { create: targets.map((target) => allocationData(target.allocation)) },
         },
       });
 
-      if (brc) {
-        // The BRC realises these export invoices: attach it to each that has none yet (invoice page, dispatch documents).
-        for (const target of targets.filter((candidate) => candidate.exportInvoice)) {
-          const invoiceId = target.allocation.documentId;
-          const has = await tx.invoiceDocument.findUnique({ where: { invoiceId_kind: { invoiceId, kind: 'BRC' } }, select: { id: true } });
-          if (has) continue;
-          await tx.invoiceDocument.create({
-            data: {
-              invoiceId,
-              kind: 'BRC',
-              number: brc.number,
-              date: dateOnly(brc.date),
-              details: { amount: target.amount, bank: (account!.bankName ?? account!.name).slice(0, 120) },
-              savedById: userId,
-            },
-          });
-        }
-      }
       return toSettlementView(await tx.settlement.findUniqueOrThrow({ where: { id }, include: settlementInclude }));
     });
   }
@@ -218,7 +188,7 @@ export class SettlementsService {
     if (direction === 'RECEIPT') {
       const invoices = await this.prisma.invoice.findMany({
         where: { status: 'ISSUED', partyId },
-        select: { id: true, number: true, date: true, kind: true, regime: true, total: true, igst: true, partyId: true, party: { select: { displayName: true, creditDays: true } } },
+        select: { id: true, number: true, date: true, total: true, partyId: true, party: { select: { displayName: true, creditDays: true } } },
         orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
       });
       for (const invoice of invoices) {
@@ -232,7 +202,7 @@ export class SettlementsService {
           partyId: invoice.partyId,
           partyName: invoice.party.displayName,
           total: owedOn(invoice),
-          flag: invoice.kind === 'EXPORT' ? 'EXPORT' : null,
+          flag: null,
         });
       }
     } else {
@@ -332,8 +302,8 @@ export class SettlementsService {
   }
 
   /**
-   * Locks and checks each target; returns its label, open balance and whether
-   * it is an export invoice. An ADVANCE is another entry of this party, of the
+   * Locks and checks each target; returns its label and open balance.
+   * An ADVANCE is another entry of this party, of the
    * other direction, still holding an advance; a CREDIT_NOTE / DEBIT_NOTE is
    * this party's live note still holding credit (refunded by a payment / receipt).
    * Also used when a note's credit is applied later (note-allocations.service.ts).
@@ -375,7 +345,7 @@ export class SettlementsService {
     const [creditUsage, debitUsage] = await Promise.all([noteUsage(tx, 'CREDIT_NOTE', creditNoteIds), noteUsage(tx, 'DEBIT_NOTE', debitNoteIds)]);
 
     const invoices = new Map(
-      (await tx.invoice.findMany({ where: { id: { in: invoiceIds } }, select: { id: true, number: true, partyId: true, status: true, kind: true, regime: true, total: true, igst: true } })).map((row) => [row.id, row]),
+      (await tx.invoice.findMany({ where: { id: { in: invoiceIds } }, select: { id: true, number: true, partyId: true, status: true, total: true } })).map((row) => [row.id, row]),
     );
     const bills = new Map(
       (await tx.purchaseBill.findMany({ where: { id: { in: billIds } }, select: { id: true, reference: true, vendorId: true, status: true, payable: true } })).map((row) => [row.id, row]),
@@ -399,19 +369,19 @@ export class SettlementsService {
         const invoice = invoices.get(allocation.documentId);
         if (!invoice || invoice.partyId !== partyId) fail('One of the invoices is not this customer’s');
         if (invoice!.status !== 'ISSUED') fail(`Invoice ${invoice!.number} is cancelled`);
-        return { allocation, label: invoice!.number, amount: allocation.amount, balance: balanceOf(owedOn(invoice!), done), exportInvoice: invoice!.kind === 'EXPORT' };
+        return { allocation, label: invoice!.number, amount: allocation.amount, balance: balanceOf(owedOn(invoice!), done) };
       }
       if (allocation.kind === 'BILL') {
         const bill = bills.get(allocation.documentId);
         if (!bill || bill.vendorId !== partyId) fail('One of the bills is not this vendor’s');
         if (bill!.status !== 'OPEN') fail(`Bill ${bill!.reference} is void`);
-        return { allocation, label: bill!.reference, amount: allocation.amount, balance: balanceOf(toNumber(bill!.payable), done), exportInvoice: false };
+        return { allocation, label: bill!.reference, amount: allocation.amount, balance: balanceOf(toNumber(bill!.payable), done) };
       }
       if (allocation.kind === 'EXPENSE') {
         const expense = expenses.get(allocation.documentId);
         if (!expense || expense.vendorId !== partyId || expense.accountId) fail('One of the expenses is not owed to this vendor');
         if (expense!.cancelledAt) fail(`Expense ${expense!.number} is cancelled`);
-        return { allocation, label: expense!.number, amount: allocation.amount, balance: balanceOf(toNumber(expense!.total), done), exportInvoice: false };
+        return { allocation, label: expense!.number, amount: allocation.amount, balance: balanceOf(toNumber(expense!.total), done) };
       }
       if (allocation.kind === 'JOURNAL') {
         const line = journalLines.get(allocation.documentId);
@@ -420,21 +390,21 @@ export class SettlementsService {
         if (line!.journal.cancelledAt) fail(`Journal ${line!.journal.number} is cancelled`);
         const charge = toNumber(side === 'RECEIVABLE' ? line!.debit : line!.credit);
         if (line!.partySide !== side || !(charge > 0)) fail(`Journal ${line!.journal.number} does not charge ${side === 'RECEIVABLE' ? 'this customer' : 'us for this vendor'}`);
-        return { allocation, label: `journal ${line!.journal.number}`, amount: allocation.amount, balance: balanceOf(charge, done), exportInvoice: false };
+        return { allocation, label: `journal ${line!.journal.number}`, amount: allocation.amount, balance: balanceOf(charge, done) };
       }
       if (allocation.kind === 'CREDIT_NOTE') {
         const note = creditNotes.get(allocation.documentId);
         if (!note || note.partyId !== partyId) fail('One of the credit notes is not this customer’s');
         if (note!.cancelledAt) fail(`${note!.number} is cancelled`);
         const balance = creditLeft(creditNotePartyAmount(note!), creditUsage.get(note!.id)!);
-        return { allocation, label: `the credit on ${note!.number}`, amount: allocation.amount, balance, exportInvoice: false };
+        return { allocation, label: `the credit on ${note!.number}`, amount: allocation.amount, balance };
       }
       if (allocation.kind === 'DEBIT_NOTE') {
         const note = debitNotes.get(allocation.documentId);
         if (!note || note.partyId !== partyId) fail('One of the debit notes is not this vendor’s');
         if (note!.cancelledAt) fail(`${note!.number} is cancelled`);
         const balance = creditLeft(debitNotePartyAmount(note!), debitUsage.get(note!.id)!);
-        return { allocation, label: `the credit on ${note!.number}`, amount: allocation.amount, balance, exportInvoice: false };
+        return { allocation, label: `the credit on ${note!.number}`, amount: allocation.amount, balance };
       }
       if (allocation.kind === 'ADVANCE') {
         const advance = advances.get(allocation.documentId);
@@ -445,11 +415,11 @@ export class SettlementsService {
         if (advance!.allocations.some((row) => row.advanceId)) fail(`${advance!.number} is itself a refund`);
         const applied = advance!.allocations.reduce((sum, row) => sum + toNumber(row.amount), 0);
         const balance = advanceLeft(toNumber(advance!.amount), toNumber(advance!.tds), applied, done);
-        return { allocation, label: `the advance on ${advance!.number}`, amount: allocation.amount, balance, exportInvoice: false };
+        return { allocation, label: `the advance on ${advance!.number}`, amount: allocation.amount, balance };
       }
       const opening = party.openingBalanceSide === OPENING_SIDE[direction] ? toNumber(party.openingBalance) : 0;
       if (opening <= 0) fail(`This party has no opening balance to ${direction === 'RECEIPT' ? 'collect' : 'pay'}`);
-      return { allocation, label: 'the opening balance', amount: allocation.amount, balance: balanceOf(opening, done), exportInvoice: false };
+      return { allocation, label: 'the opening balance', amount: allocation.amount, balance: balanceOf(opening, done) };
     });
   }
 }

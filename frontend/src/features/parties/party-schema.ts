@@ -3,7 +3,7 @@ import { needsGstin } from "@/features/gst/gst-rules";
 import { checkGstin, gstinPan, gstinStateCode } from "@/features/gst/gstin";
 
 const amount = z.union([z.literal(""), z.string().trim().regex(/^\d+(\.\d{1,2})?$/, "Enter an amount in rupees")]);
-const phone = z.string().trim().regex(/^$|^\+[1-9]\d{7,14}$/, "Use the country code, for example +919635312988");
+const phone = z.string().trim().regex(/^$|^\+[1-9]\d{7,14}$/, "Use the country code, for example +919876543210");
 
 /** A branch or delivery address. `key` is the stored id, or a new one's client key. */
 const branchSchema = z
@@ -12,7 +12,7 @@ const branchSchema = z
     stored: z.boolean(),
     kind: z.enum(["branch", "ship-to"]),
     name: z.string().trim().min(1, "Name it, for example Ranchi branch").max(80),
-    treatment: z.enum(["registered", "composition", "unregistered", "consumer", "sez"]),
+    treatment: z.enum(["registered", "composition", "unregistered", "consumer"]),
     gstin: z.string().trim().toUpperCase(),
     stateCode: z.string(),
     line1: z.string().trim().max(160),
@@ -41,7 +41,7 @@ const contactSchema = z.object({
 const licenceSchema = z
   .object({
     branch: z.string(),
-    kind: z.enum(["FSSAI", "DRUG", "TRADE", "SHOP_ESTABLISHMENT", "IEC", "OTHER"]),
+    kind: z.enum(["FSSAI", "DRUG", "TRADE", "SHOP_ESTABLISHMENT", "OTHER"]),
     label: z.string().trim().max(60),
     number: z.string().trim().toUpperCase().min(1, "Enter the number").max(40),
     validUntil: z.string(),
@@ -67,14 +67,10 @@ export const partySchema = z
     phone,
     email: z.union([z.literal(""), z.email("Enter a valid email")]),
 
-    treatment: z.enum(["registered", "composition", "unregistered", "consumer", "overseas", "sez"]),
+    treatment: z.enum(["registered", "composition", "unregistered", "consumer"]),
     gstin: z.string().trim().toUpperCase(),
     pan: z.union([z.literal(""), z.string().trim().toUpperCase().regex(/^[A-Z]{5}\d{4}[A-Z]$/, "PAN is 5 letters, 4 digits, 1 letter")]),
     placeOfSupply: z.string(),
-    country: z.string().trim(),
-    foreignTaxId: z.string().trim().max(40),
-    currency: z.enum(["INR", "BTN"]),
-    exportRoute: z.enum(["lut", "igst"]),
     isGta: z.boolean(),
     /** Vendors without a GSTIN (backend: TRANSIN_PATTERN). */
     transin: z.union([z.literal(""), z.string().trim().toUpperCase().regex(/^\d{2}[A-Z0-9]{13}$/, "15 characters: the state code, then 13 letters or digits")]),
@@ -103,13 +99,11 @@ export const partySchema = z
     if (needsGstin(values.treatment)) {
       const check = checkGstin(values.gstin);
       if (!check.valid) context.addIssue({ code: "custom", path: ["gstin"], message: check.reason });
-      else if (values.treatment !== "sez" && values.placeOfSupply && gstinStateCode(values.gstin) !== values.placeOfSupply) {
+      else if (values.placeOfSupply && gstinStateCode(values.gstin) !== values.placeOfSupply) {
         context.addIssue({ code: "custom", path: ["placeOfSupply"], message: "Does not match the state in the GSTIN" });
       }
     }
-    if (values.treatment === "overseas") {
-      if (!values.country) context.addIssue({ code: "custom", path: ["country"], message: "Enter the country" });
-    } else if (!values.placeOfSupply) {
+    if (!values.placeOfSupply) {
       context.addIssue({ code: "custom", path: ["placeOfSupply"], message: "Pick the place of supply" });
     }
     // Same PAN = same business; another PAN is its own party.

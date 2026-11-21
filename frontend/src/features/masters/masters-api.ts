@@ -15,7 +15,7 @@ export const GODOWNS_PATH = "/godowns";
 export const BANK_CASH_PATH = "/bank-cash-accounts";
 export const ACCOUNT_HEADS_PATH = "/account-heads";
 export const VEHICLES_PATH = "/vehicles";
-/** Read only: transport vendors with their vehicle and shipment counts. */
+/** Read only: transport vendors with their vehicle counts. */
 export const TRANSPORTERS_PATH = "/transporters";
 
 /** The list RecordMaster shows: archived records too, behind its Archived filter. */
@@ -100,7 +100,7 @@ export const toVehicle = (vehicle: VehicleView): Vehicle => ({
   driverName: vehicle.driverName ?? undefined,
   driverPhone: vehicle.driverPhone ?? undefined,
   notes: vehicle.notes ?? undefined,
-  shipmentCount: vehicle.shipmentCount,
+  useCount: vehicle.useCount,
   archived: vehicle.isArchived,
 });
 

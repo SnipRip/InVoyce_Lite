@@ -6,7 +6,6 @@ import type { LineRateSourceView, SaleRegimeView } from "./quotation";
 import type { AppliedSchemeView } from "./scheme";
 import type { StockDrawView } from "./stock-moves";
 
-export type InvoiceKindView = "LOCAL" | "EXPORT";
 export type InvoiceStatusView = "ISSUED" | "CANCELLED";
 
 /** One FIFO slice of a line's goods, with where it came from (a bill, a transfer in, an adjustment, the opening stock). */
@@ -37,15 +36,7 @@ export interface InvoiceLineView {
   draws: InvoiceDrawView[];
 }
 
-export type DispatchDocumentKindView =
-  | "E_INVOICE"
-  | "LORRY_CHALLAN"
-  | "EWAY_BILL"
-  | "CUSTOMS_INVOICE"
-  | "PACKING_LIST"
-  | "SHIPPING_BILL"
-  | "LEO"
-  | "BRC";
+export type DispatchDocumentKindView = "E_INVOICE" | "LORRY_CHALLAN" | "EWAY_BILL";
 
 /** One attached dispatch document; amounts and weights in `details` are numbers. */
 export interface InvoiceDocumentView {
@@ -60,7 +51,6 @@ export interface InvoiceDocumentView {
 
 export interface InvoiceView {
   id: string;
-  kind: InvoiceKindView;
   number: string;
   date: string;
   partyId: string;
@@ -76,9 +66,6 @@ export interface InvoiceView {
   /** False: entered without GST (every line at 0%). */
   gstApplicable: boolean;
   placeOfSupply: string | null;
-  lutArn: string | null;
-  destinationCountry: string | null;
-  currency: "INR" | "BTN";
   shipToLine: string | null;
   shipToCity: string | null;
   vehicleNumber: string | null;

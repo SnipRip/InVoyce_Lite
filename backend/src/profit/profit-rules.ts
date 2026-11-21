@@ -1,24 +1,33 @@
-// Actual profit (SOW 14, 15): sales before GST less the FIFO cost of the
-// goods less the expenses booked on the sale, cut by invoice, shipment,
-// customer and item. Pure: the service loads the facts.
+// Actual profit: sales before GST less the FIFO cost of the goods less the
+// expenses booked on the sale, cut by invoice, customer and item. Pure: the
+// service loads the facts.
 //
 // - Sales and cost come from the issued invoice (taxable value, cost of the
 //   batches its lines drew); item-cost expenses are already inside that cost
 //   through the bill's landed rate, so they are never counted again.
-// - An invoice's own expenses are spread over its lines by value; a truck's
-//   expenses over every invoice it carries by value, so a truck whose
-//   invoices fall in two periods splits its expenses between them.
-// - Every view adds up to the same total: the shipment view has a row for
-//   sales on no truck.
-// - Overheads and shipment expenses not linked to a truck yet belong to no
-//   sale: they come off once, as net profit.
-import { shipmentProfit, type ShipmentProfit } from '../shipments/shipment-rules.js';
-
-/** Sales, cost, expenses, profit and margin: the same sum the shipment page shows. */
-export type Profit = ShipmentProfit;
-export const profitOf = shipmentProfit;
+// - An invoice's own expenses are spread over its lines by value.
+// - Every view adds up to the same total.
+// - Overheads belong to no sale: they come off once, as net profit.
 
 const money = (value: number) => Math.round(value * 100) / 100;
+
+/** Sales, cost, expenses, profit and margin of a set of sales. */
+export interface Profit {
+  sales: number;
+  cost: number;
+  /** Expenses booked on the sales (their cost: amount plus GST not claimable). */
+  expenses: number;
+  profit: number;
+  marginPct: number;
+}
+
+export function profitOf(invoices: { taxable: number; cost: number }[], expenseCosts: number[]): Profit {
+  const sales = money(invoices.reduce((sum, invoice) => sum + invoice.taxable, 0));
+  const cost = money(invoices.reduce((sum, invoice) => sum + invoice.cost, 0));
+  const expenses = money(expenseCosts.reduce((sum, value) => sum + value, 0));
+  const profit = money(sales - cost - expenses);
+  return { sales, cost, expenses, profit, marginPct: sales ? Math.round((profit / sales) * 10_000) / 100 : 0 };
+}
 
 export interface ProfitLine {
   itemId: string;
@@ -37,19 +46,8 @@ export interface ProfitInvoice {
   taxable: number;
   cost: number;
   lines: ProfitLine[];
-  /** The truck carrying it (a link not released by a cancel). */
-  shipmentId: string | null;
   /** Set on a credit note in the period against an invoice from before it: a negative sale of its own. */
   creditNoteOf?: string;
-}
-
-export interface ProfitShipment {
-  id: string;
-  number: string;
-  vehicleNumber: string;
-  destination: string;
-  /** Taxable value of every issued invoice it carries, in or out of the period: the base its expenses are shared on. */
-  invoices: { id: string; taxable: number }[];
 }
 
 export interface ProfitExpense {
@@ -58,17 +56,16 @@ export interface ProfitExpense {
   headName: string;
   /** Amount plus GST that cannot be claimed. */
   cost: number;
-  allocation: 'ITEM_COST' | 'INVOICE' | 'SHIPMENT' | 'OVERHEAD';
+  allocation: 'ITEM_COST' | 'INVOICE' | 'OVERHEAD';
   invoiceId: string | null;
-  shipmentId: string | null;
 }
 
 export interface ProfitRow extends Profit {
   key: string;
   label: string;
   detail: string | null;
-  /** Where the row links to: invoice, shipment, customer or item page. */
-  kind: 'invoice' | 'creditNote' | 'shipment' | 'customer' | 'item' | null;
+  /** Where the row links to: invoice, customer or item page. */
+  kind: 'invoice' | 'creditNote' | 'customer' | 'item' | null;
 }
 
 export interface HeadTotal {
@@ -79,13 +76,10 @@ export interface HeadTotal {
 
 export interface ProfitReport {
   byInvoice: ProfitRow[];
-  byShipment: ProfitRow[];
   byCustomer: ProfitRow[];
   byItem: ProfitRow[];
   total: Profit;
   overheads: { total: number; byHead: HeadTotal[] };
-  /** Shipment expenses saved without a truck, and truck expenses with no sales value to share them on. */
-  unassigned: { total: number; count: number };
   netProfit: number;
 }
 
@@ -121,40 +115,9 @@ function groupRows<K>(entries: { key: K; slice: Slice }[]): Map<K, Slice[]> {
   return groups;
 }
 
-export function buildProfitReport(invoices: ProfitInvoice[], shipments: ProfitShipment[], expenses: ProfitExpense[], overheadExpenses: ProfitExpense[]): ProfitReport {
-  const shipmentById = new Map(shipments.map((shipment) => [shipment.id, shipment]));
-
-  // Each truck's expenses shared over everything it carries, by value.
-  const truckShare = new Map<string, number>();
-  let unassignedTotal = 0;
-  let unassignedCount = 0;
-  for (const shipment of shipments) {
-    const costs = expenses.filter((expense) => expense.allocation === 'SHIPMENT' && expense.shipmentId === shipment.id).map((expense) => expense.cost);
-    const onTruck = sum(costs);
-    if (!onTruck) continue;
-    const shares = shareByValue(
-      onTruck,
-      shipment.invoices.map((invoice) => invoice.taxable),
-    );
-    if (shares.every((share) => share === 0)) {
-      unassignedTotal = money(unassignedTotal + onTruck);
-      unassignedCount += costs.length;
-      continue;
-    }
-    shipment.invoices.forEach((invoice, index) => truckShare.set(invoice.id, shares[index] ?? 0));
-  }
-  for (const expense of expenses) {
-    if (expense.allocation === 'SHIPMENT' && (!expense.shipmentId || !shipmentById.has(expense.shipmentId))) {
-      unassignedTotal = money(unassignedTotal + expense.cost);
-      unassignedCount += 1;
-    }
-  }
-
+export function buildProfitReport(invoices: ProfitInvoice[], expenses: ProfitExpense[], overheadExpenses: ProfitExpense[]): ProfitReport {
   const expensesOn = (invoice: ProfitInvoice) =>
-    money(
-      sum(expenses.filter((expense) => expense.allocation === 'INVOICE' && expense.invoiceId === invoice.id).map((expense) => expense.cost)) +
-        (truckShare.get(invoice.id) ?? 0),
-    );
+    sum(expenses.filter((expense) => expense.allocation === 'INVOICE' && expense.invoiceId === invoice.id).map((expense) => expense.cost));
 
   const invoiceSlices = invoices.map((invoice) => ({
     invoice,
@@ -164,40 +127,10 @@ export function buildProfitReport(invoices: ProfitInvoice[], shipments: ProfitSh
   const byInvoice: ProfitRow[] = invoiceSlices.map(({ invoice, slice }) => ({
     key: invoice.id,
     label: invoice.number,
-    detail: invoice.creditNoteOf
-      ? `${invoice.partyName} · return against ${invoice.creditNoteOf}`
-      : invoice.shipmentId
-        ? `${invoice.partyName} · ${shipmentById.get(invoice.shipmentId)?.number ?? ''}`
-        : invoice.partyName,
+    detail: invoice.creditNoteOf ? `${invoice.partyName} · return against ${invoice.creditNoteOf}` : invoice.partyName,
     kind: invoice.creditNoteOf ? 'creditNote' : 'invoice',
     ...profitOfSlices([slice]),
   }));
-
-  const byTruck = groupRows(invoiceSlices.map(({ invoice, slice }) => ({ key: invoice.shipmentId, slice })));
-  const byShipment: ProfitRow[] = [];
-  for (const [shipmentId, slices] of byTruck) {
-    const shipment = shipmentId ? shipmentById.get(shipmentId) : undefined;
-    if (!shipment) continue;
-    const inPeriod = slices.length;
-    const partly = inPeriod < shipment.invoices.length ? ` · ${inPeriod} of ${shipment.invoices.length} invoices in this period` : '';
-    byShipment.push({
-      key: shipment.id,
-      label: shipment.number,
-      detail: `${shipment.vehicleNumber} to ${shipment.destination}${partly}`,
-      kind: 'shipment',
-      ...profitOfSlices(slices),
-    });
-  }
-  const offTruck = invoiceSlices.filter(({ invoice }) => !invoice.shipmentId || !shipmentById.has(invoice.shipmentId));
-  if (offTruck.length) {
-    byShipment.push({
-      key: 'none',
-      label: 'Not on a truck',
-      detail: `${offTruck.length} invoice${offTruck.length === 1 ? '' : 's'}: local sales and exports not loaded`,
-      kind: null,
-      ...profitOfSlices(offTruck.map(({ slice }) => slice)),
-    });
-  }
 
   const customers = groupRows(invoiceSlices.map(({ invoice, slice }) => ({ key: invoice.partyId, slice })));
   const byCustomer: ProfitRow[] = [...customers].map(([partyId, slices]) => ({
@@ -235,12 +168,10 @@ export function buildProfitReport(invoices: ProfitInvoice[], shipments: ProfitSh
 
   return {
     byInvoice,
-    byShipment,
     byCustomer,
     byItem,
     total,
     overheads: { total: overheadTotal, byHead: [...heads.values()].sort((a, b) => b.amount - a.amount) },
-    unassigned: { total: unassignedTotal, count: unassignedCount },
-    netProfit: money(total.profit - overheadTotal - unassignedTotal),
+    netProfit: money(total.profit - overheadTotal),
   };
 }

@@ -74,13 +74,14 @@ export interface Vehicle extends MasterRecord {
   driverName?: string;
   driverPhone?: string;
   notes?: string;
-  shipmentCount?: number;
+  /** Invoices and stock transfers that carried it. */
+  useCount?: number;
 }
 
 /** follows-bill: takes the goods bill's rate; own-rate: the head's own rate; none: no GST. */
 export type HeadGst = "follows-bill" | "own-rate" | "none";
 /** Where an expense's cost lands for actual profit (SOW 14). */
-export type HeadAllocation = "item-cost" | "invoice" | "shipment" | "overhead";
+export type HeadAllocation = "item-cost" | "invoice" | "overhead";
 /** The ledger group the head's ledger goes under. */
 export type HeadNature = "direct-expense" | "indirect-expense" | "direct-income" | "indirect-income";
 

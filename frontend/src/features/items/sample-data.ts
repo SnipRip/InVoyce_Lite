@@ -308,7 +308,7 @@ export function sampleMovements(target: Item): StockMovement[] {
   return [
     { date: "2026-04-01", kind: "Opening", reference: "Opening stock", quantity: opening, rate: target.lastLandedCost ?? 0 },
     { date: "2026-09-18", kind: "Purchase", reference: "PUR-2609-014", party: target.preferredSupplier ?? "Bhoomi And Buildings Pvt Ltd", quantity: Math.round(target.stock * 0.7), rate: target.lastLandedCost ?? 0 },
-    { date: "2026-10-06", kind: "Sale", reference: "INV-2610-031", party: "Tashi Construction, Thimphu", quantity: -Math.round(target.stock * 0.25), rate: sold },
-    { date: "2026-10-21", kind: "Sale", reference: "INV-2610-058", party: "Druk Builders, Phuentsholing", quantity: -Math.round(target.stock * 0.05), rate: sold },
+    { date: "2026-10-06", kind: "Sale", reference: "INV-2610-031", party: "Jalpaiguri Builders, Jalpaiguri", quantity: -Math.round(target.stock * 0.25), rate: sold },
+    { date: "2026-10-21", kind: "Sale", reference: "INV-2610-058", party: "Cooch Behar Construction, Cooch Behar", quantity: -Math.round(target.stock * 0.05), rate: sold },
   ];
 }

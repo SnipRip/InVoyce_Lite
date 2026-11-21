@@ -24,11 +24,9 @@ import {
 } from '../../common/dto/text-transforms.js';
 import {
   BalanceSide,
-  ExportRoute,
   GstTreatment,
   MsmeActivity,
   MsmeCategory,
-  PartyCurrency,
   PartyKind,
 } from '../../generated/prisma/enums.js';
 
@@ -95,26 +93,6 @@ export class CreatePartyDto {
     message: 'Place of supply is a two-digit GST state code',
   })
   placeOfSupply?: string | null;
-
-  @Transform(trimToNull)
-  @IsOptional()
-  @IsString()
-  @MaxLength(60)
-  country?: string | null;
-
-  @Transform(trimToNull)
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  foreignTaxId?: string | null;
-
-  @IsOptional()
-  @IsEnum(PartyCurrency)
-  currency?: PartyCurrency;
-
-  @IsOptional()
-  @IsEnum(ExportRoute)
-  exportRoute?: ExportRoute | null;
 
   @IsOptional()
   @IsBoolean()

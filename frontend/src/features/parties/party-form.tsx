@@ -56,15 +56,14 @@ function MsmeNote({ control, isVendor }: { control: Control<PartyFormValues>; is
 const stepOfErrors = (errors: FieldErrors<PartyFormValues>) =>
   errors.roles || errors.displayName || errors.legalName || errors.contactPerson || errors.phone || errors.email
     ? 0
-    : errors.treatment || errors.gstin || errors.pan || errors.country || errors.foreignTaxId || errors.placeOfSupply || errors.transin || errors.addressLine || errors.city || errors.pin
+    : errors.treatment || errors.gstin || errors.pan || errors.placeOfSupply || errors.transin || errors.addressLine || errors.city || errors.pin
       ? 1
       : errors.branches || errors.contacts || errors.licences
         ? 2
         : 3;
 
 // The contact form for customers and vendors. GST treatment decides
-// which fields show: a GSTIN fills in the state and PAN, an overseas party
-// gets country, tax ID and export route instead of a place of supply.
+// which fields show: a GSTIN fills in the state and PAN.
 export function PartyForm({ role, party, company, onSave, onArchive }: PartyFormProps) {
   const [result, setResult] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const {
@@ -76,16 +75,15 @@ export function PartyForm({ role, party, company, onSave, onArchive }: PartyForm
     formState: { errors, isSubmitting, isDirty },
   } = useForm<PartyFormValues>({ resolver: zodResolver(partySchema), defaultValues: toPartyValues(role, party) });
 
-  const [roles, treatment, gstin, placeOfSupply, exportRoute, isGta, balanceSide, udyamNumber] = useWatch({
+  const [roles, treatment, gstin, placeOfSupply, isGta, balanceSide, udyamNumber] = useWatch({
     control,
-    name: ["roles", "treatment", "gstin", "placeOfSupply", "exportRoute", "isGta", "openingBalanceSide", "udyamNumber"],
+    name: ["roles", "treatment", "gstin", "placeOfSupply", "isGta", "openingBalanceSide", "udyamNumber"],
   });
   const [archiving, setArchiving] = useState(false);
   const [step, setStep] = useState(0);
   const displayName = useWatch({ control, name: "displayName" });
   const isCustomer = roles.includes("customer");
   const isVendor = roles.includes("vendor");
-  const overseas = treatment === "overseas";
   const gstinCheck = gstin ? checkGstin(gstin) : undefined;
 
   const onGstinChange = (value: string) => {
@@ -93,7 +91,7 @@ export function PartyForm({ role, party, company, onSave, onArchive }: PartyForm
     setValue("gstin", upper, { shouldDirty: true });
     if (checkGstin(upper).valid) {
       setValue("pan", gstinPan(upper), { shouldDirty: true });
-      if (treatment !== "sez") setValue("placeOfSupply", gstinStateCode(upper), { shouldDirty: true, shouldValidate: true });
+      setValue("placeOfSupply", gstinStateCode(upper), { shouldDirty: true, shouldValidate: true });
     }
   };
 
@@ -195,8 +193,8 @@ export function PartyForm({ role, party, company, onSave, onArchive }: PartyForm
           {
             id: "gst",
             title: "GST & address",
-            summary: overseas ? "Overseas" : placeOfSupply ? stateName(placeOfSupply) : undefined,
-            invalid: Boolean(errors.treatment || errors.gstin || errors.pan || errors.country || errors.foreignTaxId || errors.placeOfSupply || errors.transin || errors.addressLine || errors.city || errors.pin),
+            summary: placeOfSupply ? stateName(placeOfSupply) : undefined,
+            invalid: Boolean(errors.treatment || errors.gstin || errors.pan || errors.placeOfSupply || errors.transin || errors.addressLine || errors.city || errors.pin),
             content: (
               <>
                     <Controller
@@ -230,66 +228,22 @@ export function PartyForm({ role, party, company, onSave, onArchive }: PartyForm
                       </div>
                     )}
 
-                    {overseas ? (
-                      <div className="grid gap-x-3.5 gap-y-3 @xl:grid-cols-2 @4xl:grid-cols-3">
-                        <TextField label="Country" placeholder="Bhutan" error={errors.country?.message} {...register("country")} />
-                        <TextField
-                          label="Their tax ID"
-                          placeholder="Bhutan TPN or equivalent"
-                          error={errors.foreignTaxId?.message}
-                          {...register("foreignTaxId")}
-                        />
-                        <Controller
-                          control={control}
-                          name="currency"
-                          render={({ field }) => (
-                            <SelectField
-                              label="Currency"
-                              options={[
-                                { value: "INR", label: "Indian rupee (INR)" },
-                                { value: "BTN", label: "Bhutanese ngultrum (BTN)" },
-                              ]}
-                              value={field.value}
-                              onValueChange={field.onChange}
-                            />
-                          )}
-                        />
-                        {isCustomer && (
-                          <Controller
-                            control={control}
-                            name="exportRoute"
-                            render={({ field }) => (
-                              <SelectField
-                                label="Export route for this buyer"
-                                options={[
-                                  { value: "lut", label: "Under LUT, no GST" },
-                                  { value: "igst", label: "IGST paid, refund later" },
-                                ]}
-                                value={field.value}
-                                onValueChange={field.onChange}
-                              />
-                            )}
-                          />
-                        )}
-                      </div>
-                    ) : (
                       <Controller
                         control={control}
                         name="placeOfSupply"
                         render={({ field }) => (
                           <div className="flex flex-col gap-1.5">
                             <SelectField
-                              label={needsGstin(treatment) && treatment !== "sez" ? "Place of supply · from the GSTIN" : "Place of supply"}
+                              label={needsGstin(treatment) ? "Place of supply · from the GSTIN" : "Place of supply"}
                               options={stateOptions}
                               value={field.value || undefined}
                               onValueChange={field.onChange}
-                              disabled={needsGstin(treatment) && treatment !== "sez" && Boolean(gstinCheck?.valid)}
+                              disabled={needsGstin(treatment) && Boolean(gstinCheck?.valid)}
                             />
                             {errors.placeOfSupply && <p className="text-xs font-semibold text-danger-strong">{errors.placeOfSupply.message}</p>}
                           </div>
                         )}
                       />
-                    )}
 
                     {isVendor && (
                       <Controller
@@ -312,7 +266,7 @@ export function PartyForm({ role, party, company, onSave, onArchive }: PartyForm
                       />
                     )}
 
-                    {isVendor && !needsGstin(treatment) && treatment !== "overseas" && (
+                    {isVendor && !needsGstin(treatment) && (
                       <TextField
                         label="TRANSIN (transporter ID)"
                         placeholder="19AAAAA0000A1Z5"
@@ -322,13 +276,13 @@ export function PartyForm({ role, party, company, onSave, onArchive }: PartyForm
                       />
                     )}
                 <div className="flex flex-col gap-3.5 border-t border-line pt-3.5">
-                  <CardTitle>{overseas ? "Address" : "Main branch address"}</CardTitle>
+                  <CardTitle>Main branch address</CardTitle>
                       <div className="grid gap-3.5 @xl:grid-cols-[2fr_1fr_1fr]">
                         <TextField label="Street / area" error={errors.addressLine?.message} {...register("addressLine")} />
                         <TextField label="City / town" error={errors.city?.message} {...register("city")} />
-                        {!overseas && <TextField label="PIN code" inputMode="numeric" error={errors.pin?.message} {...register("pin")} />}
+                        <TextField label="PIN code" inputMode="numeric" error={errors.pin?.message} {...register("pin")} />
                       </div>
-                      {!overseas && placeOfSupply && (
+                      {placeOfSupply && (
                         <p className="text-xs font-semibold text-muted">State: {stateName(placeOfSupply)}, from the place of supply.</p>
                       )}
                 </div>
@@ -341,7 +295,7 @@ export function PartyForm({ role, party, company, onSave, onArchive }: PartyForm
             invalid: Boolean(errors.branches || errors.contacts || errors.licences),
             content: (
               <>
-                {!overseas && <BranchesCard control={control} register={register} setValue={setValue} errors={errors} />}
+                <BranchesCard control={control} register={register} setValue={setValue} errors={errors} />
                 <ContactsCard control={control} register={register} setValue={setValue} errors={errors} />
                 <LicencesCard control={control} register={register} setValue={setValue} errors={errors} />
               </>
@@ -458,7 +412,7 @@ export function PartyForm({ role, party, company, onSave, onArchive }: PartyForm
         }
         aside={
           <>
-            <PartyTaxPreview company={company} roles={roles} profile={taxProfileOf({ treatment, placeOfSupply, exportRoute, isGta })} />
+            <PartyTaxPreview company={company} roles={roles} profile={taxProfileOf({ treatment, placeOfSupply, isGta })} />
             {result && <FormMessage tone={result.tone} result={result}>{result.text}</FormMessage>}
           </>
         }

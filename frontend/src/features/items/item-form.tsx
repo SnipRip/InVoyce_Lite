@@ -414,7 +414,7 @@ export function ItemForm({ catalog, item, brands, units, godowns, gstRates, onSa
                   </InheritedField>
                   {catalog.hsnCodes && <HsnSummary codes={catalog.hsnCodes} code={hsn || undefined} />}
                   <p className="text-xs font-semibold text-muted">
-                    CGST + SGST or IGST is decided on each invoice from the place of supply. Bhutan exports under LUT carry no GST.
+                    CGST + SGST or IGST is decided on each invoice from the place of supply.
                   </p>
                 </section>
               </div>

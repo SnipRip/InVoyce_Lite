@@ -16,11 +16,7 @@ const TREATMENTS = {
   COMPOSITION: 'Composition',
   UNREGISTERED: 'Unregistered business',
   CONSUMER: 'Consumer',
-  OVERSEAS: 'Overseas',
-  SEZ: 'SEZ',
 };
-const CURRENCIES = { INR: 'INR', BTN: 'BTN' };
-const ROUTES = { LUT: 'Under LUT (no IGST)', IGST: 'IGST paid' };
 const SIDES = { RECEIVABLE: 'They owe us', PAYABLE: 'We owe them' };
 
 const label = (choices: Record<string, string>, value: string | null) => (value ? (choices[value] ?? value) : null);
@@ -31,14 +27,11 @@ function partyColumns(role: 'customer' | 'vendor'): ImportColumn<Party>[] {
     { header: 'Legal name', field: 'legalName', kind: 'text', value: (party) => party.legalName },
     { header: 'Business or individual', field: 'kind', kind: 'choice', choices: KINDS, keepIfBlank: true, value: (party) => label(KINDS, party.kind) },
     { header: 'GST treatment', field: 'treatment', kind: 'choice', choices: TREATMENTS, required: true, value: (party) => label(TREATMENTS, party.treatment) },
-    { header: 'GSTIN', field: 'gstin', kind: 'text', hint: 'Registered, composition and SEZ parties.', value: (party) => party.gstin },
+    { header: 'GSTIN', field: 'gstin', kind: 'text', hint: 'Registered and composition parties.', value: (party) => party.gstin },
     { header: 'PAN', field: 'pan', kind: 'text', hint: 'Blank: taken from the GSTIN.', value: (party) => party.pan },
     { header: 'Place of supply', field: 'placeOfSupply', kind: 'text', hint: 'Two-digit GST state code, 19 for West Bengal. Blank: from the GSTIN.', value: (party) => party.placeOfSupply },
-    { header: 'Country', field: 'country', kind: 'text', hint: 'Overseas parties only: Bhutan…', value: (party) => party.country },
-    { header: 'Foreign tax ID', field: 'foreignTaxId', kind: 'text', value: (party) => party.foreignTaxId },
-    { header: 'Currency', field: 'currency', kind: 'choice', choices: CURRENCIES, keepIfBlank: true, value: (party) => party.currency },
     ...(role === 'customer'
-      ? [{ header: 'Export route', field: 'exportRoute', kind: 'choice', choices: ROUTES, value: (party) => label(ROUTES, party.exportRoute) } satisfies ImportColumn<Party>]
+      ? []
       : [
           { header: 'Bills as a GTA', field: 'isGta', kind: 'yesno', hint: 'A goods transport agency: freight under reverse charge.', value: (party) => (party.isGta ? 'Yes' : 'No') } satisfies ImportColumn<Party>,
           { header: 'TRANSIN', field: 'transin', kind: 'text', hint: 'A transporter without a GSTIN: its 15-character transporter ID for e-way bills.', value: (party) => party.transin } satisfies ImportColumn<Party>,

@@ -17,7 +17,7 @@ export const PURPOSES: { value: MessageTemplate["purpose"]; label: string }[] = 
   { value: "quotation", label: "Quotation" },
   { value: "invoice", label: "Invoice" },
   { value: "payment-reminder", label: "Payment reminder" },
-  { value: "shipment", label: "Shipment update" },
+  { value: "shipment", label: "Dispatch update" },
   { value: "general", label: "General" },
 ];
 

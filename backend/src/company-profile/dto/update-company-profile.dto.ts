@@ -16,9 +16,7 @@ import {
   trimToNull,
 } from '../../common/dto/text-transforms.js';
 import {
-  ExportRoute,
   GstRegistration,
-  PartyCurrency,
 } from '../../generated/prisma/enums.js';
 
 // Field formats only. How GSTIN, PAN and state fit together is checked in
@@ -56,13 +54,6 @@ export class UpdateCompanyProfileDto {
   @IsOptional()
   @Matches(/^\d{2}$/, { message: 'State is a two-digit GST state code' })
   stateCode?: string;
-
-  @Transform(codeOrNull)
-  @IsOptional()
-  @Matches(/^[A-Z0-9]{10}$/, {
-    message: 'The IEC has 10 letters and digits',
-  })
-  iec?: string | null;
 
   @Transform(trimToNull)
   @IsOptional()
@@ -102,33 +93,6 @@ export class UpdateCompanyProfileDto {
   @IsEmail({}, { message: 'Enter a valid email' })
   @MaxLength(254)
   email?: string | null;
-
-  @Transform(trimToNull)
-  @IsOptional()
-  @IsString()
-  @MaxLength(80)
-  exportBank?: string | null;
-
-  @Transform(trimToNull)
-  @IsOptional()
-  @IsString()
-  @MaxLength(80)
-  customsStation?: string | null;
-
-  @Transform(codeOrNull)
-  @IsOptional()
-  @Matches(/^[A-Z0-9]{6}$/, {
-    message: 'Port codes have 6 letters and digits, like INJIGB',
-  })
-  portCode?: string | null;
-
-  @IsOptional()
-  @IsEnum(ExportRoute)
-  defaultExportRoute?: ExportRoute;
-
-  @IsOptional()
-  @IsEnum(PartyCurrency)
-  exportCurrency?: PartyCurrency;
 
   /** On: document lines take only their HSN's GST rate. */
   @IsOptional()

@@ -1,6 +1,6 @@
 // Customers and vendors share one shape (one party can be both); `roles` says
 // which they are, and one party can be both.
-import type { ExportRoute, GstTreatment } from "@/features/gst/gst-rules";
+import type { GstTreatment } from "@/features/gst/gst-rules";
 import type { LicenceKind } from "@/types/party";
 
 /**
@@ -48,10 +48,8 @@ export type PartyRole = "customer" | "vendor";
 export interface Address {
   line1: string;
   city: string;
-  /** GST state code for India. */
+  /** GST state code. */
   stateCode?: string;
-  /** Outside India only. */
-  country?: string;
   pin?: string;
 }
 
@@ -69,12 +67,8 @@ export interface Party {
   treatment: GstTreatment;
   gstin?: string;
   pan?: string;
-  /** Place of supply: GST state code. Overseas parties have none. */
+  /** Place of supply: GST state code. */
   placeOfSupply?: string;
-  /** Overseas: the buyer's own tax ID, e.g. Bhutan TPN. */
-  foreignTaxId?: string;
-  currency: "INR" | "BTN";
-  exportRoute?: ExportRoute;
 
   billing: Address;
   shipping?: Address;

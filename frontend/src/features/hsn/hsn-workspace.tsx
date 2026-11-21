@@ -140,7 +140,7 @@ export function HsnWorkspace({ codes, gstRates, onChanged }: HsnWorkspaceProps) 
         {visible.length === 0 && <p className="py-6 text-center text-[13px] text-muted">No codes match.</p>}
         <p className="text-xs font-semibold text-muted">
           Items take their GST rate from the most specific code here that their HSN starts with: 72142090 uses 72142090 if
-          it is listed, otherwise 721420, otherwise 7214. Shipping bills need the full 8-digit code on the item.
+          it is listed, otherwise 721420, otherwise 7214.
         </p>
       </GlassCard>
 

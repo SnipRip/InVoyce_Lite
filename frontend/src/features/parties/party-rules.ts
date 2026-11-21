@@ -4,10 +4,9 @@ import type { OpenDocumentView } from "@/types/settlement";
 import type { Party, PartyRole } from "./types";
 import type { OurRegistration } from "@/types/company";
 
-export const taxProfileOf = (party: Pick<Party, "treatment" | "placeOfSupply" | "exportRoute" | "isGta">): PartyTaxProfile => ({
+export const taxProfileOf = (party: Pick<Party, "treatment" | "placeOfSupply" | "isGta">): PartyTaxProfile => ({
   treatment: party.treatment,
   stateCode: party.placeOfSupply,
-  exportRoute: party.exportRoute,
   isGta: party.isGta,
 });
 
@@ -15,9 +14,8 @@ export const taxProfileOf = (party: Pick<Party, "treatment" | "placeOfSupply" | 
 export const taxFor = (role: PartyRole, company: OurRegistration, party: Party) =>
   role === "customer" ? saleTax(company, taxProfileOf(party)) : purchaseTax(company, taxProfileOf(party));
 
-/** "Siliguri, West Bengal" or "Thimphu, Bhutan". */
-export const placeOf = (party: Party) =>
-  [party.billing.city, party.billing.country ?? stateName(party.billing.stateCode)].filter(Boolean).join(", ");
+/** "Siliguri, West Bengal". */
+export const placeOf = (party: Party) => [party.billing.city, stateName(party.billing.stateCode)].filter(Boolean).join(", ");
 
 /**
  * What each party owes us (customers) or we owe them (vendors) today: the

@@ -44,7 +44,7 @@ const TEXT = {
 };
 
 /** The fields on each step, to mark a step red and open it on a failed save. */
-const STEP_FIELDS = [["partyId", "date", "amount", "accountId", "reference", "tds"], ["allocations", "brcNumber", "brcDate", "notes"]] as const;
+const STEP_FIELDS = [["partyId", "date", "amount", "accountId", "reference", "tds"], ["allocations", "notes"]] as const;
 
 // Money in from a customer or out to a vendor through a real bank or cash
 // account, applied to the party's open invoices or bills (and opening
@@ -81,8 +81,6 @@ export function SettlementForm({ direction, parties, documents, accounts, initia
       accountId: firstFor("BANK_TRANSFER"),
       reference: "",
       tds: "",
-      brcNumber: "",
-      brcDate: "",
       notes: "",
       allocations: initial ? rowsFor(initial.partyId, initial.id) : [],
     },
@@ -103,7 +101,6 @@ export function SettlementForm({ direction, parties, documents, accounts, initia
   const applied = (allocations ?? []).reduce((sum, allocation) => sum + (Number(allocation.amount) || 0), 0);
   const available = (Number(amount) || 0) + (Number(tds) || 0);
   const byId = new Map(documents.map((document) => [document.id, document]));
-  const exportApplied = (allocations ?? []).some((allocation) => Number(allocation.amount) > 0 && byId.get(allocation.documentId)?.flag === "EXPORT");
 
   const pickParty = (id: string) => {
     setValue("partyId", id, { shouldValidate: true });
@@ -133,8 +130,6 @@ export function SettlementForm({ direction, parties, documents, accounts, initia
           amount: Number(values.amount) || 0,
           tds: Number(values.tds) || 0,
           reference: values.reference || null,
-          brcNumber: exportApplied && values.brcNumber ? values.brcNumber : null,
-          brcDate: exportApplied && values.brcNumber ? values.brcDate : null,
           notes: values.notes || null,
           allocations: values.allocations
             .filter((row) => Number(row.amount) > 0)
@@ -254,18 +249,6 @@ export function SettlementForm({ direction, parties, documents, accounts, initia
                     <AllocationTable documents={openRows} rowIds={rows.fields.map((field) => field.id)} register={register} errors={errors} today={today} documentWord={text.document} />
                   )}
                 </div>
-                {direction === "RECEIPT" && exportApplied && (
-                  <div className="flex flex-col gap-3 border-t border-line pt-3.5">
-                    <CardTitle>Bank realisation certificate</CardTitle>
-                    <p className="-mt-1.5 text-sm font-medium text-muted">
-                      Export proceeds: the BRC / e-BRC from the bank links this payment to the export invoice. Add it now (it is also attached to each export invoice that has none) or later on the invoice page.
-                    </p>
-                    <div className="grid gap-3.5 @xl:grid-cols-2">
-                      <TextField label="BRC / e-BRC number" error={errors.brcNumber?.message} {...register("brcNumber")} />
-                      <TextField label="BRC date" type="date" error={errors.brcDate?.message} {...register("brcDate")} />
-                    </div>
-                  </div>
-                )}
                 <TextField label="Notes" error={errors.notes?.message} {...register("notes")} />
               </>
             ),

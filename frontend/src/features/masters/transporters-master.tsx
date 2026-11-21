@@ -15,7 +15,7 @@ import { SearchField } from "@/components/ui/search-field";
 import { StatTile } from "@/components/ui/stat-tile";
 import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
 import { apiGet } from "@/lib/api-client";
-import { formatDate, formatQuantity } from "@/lib/format";
+import { formatQuantity } from "@/lib/format";
 import type { TransporterView } from "@/types/transporter";
 import { TRANSPORTERS_PATH, withArchived } from "./masters-api";
 
@@ -41,7 +41,7 @@ const matches = (transporter: TransporterView, needle: string) =>
 
 // Transporters (real): a view of the vendors who carry our goods, not a
 // table of its own. A vendor shows here when it bills freight as a GTA, has
-// a hired vehicle on the vehicle master or carried a shipment. Name, GSTIN
+// a hired vehicle on the vehicle master. Name, GSTIN
 // and GTA are edited on the vendor record; trucks on the vehicle master.
 export function TransportersMaster() {
   const { data, error } = useSWR<TransporterView[]>(withArchived(TRANSPORTERS_PATH), apiGet);
@@ -103,8 +103,6 @@ export function TransportersMaster() {
               <th scope="col" className="text-left">Transporter ID (e-way bill)</th>
               <th scope="col" className="text-left">Freight GST</th>
               <th scope="col">Vehicles</th>
-              <th scope="col">Shipments</th>
-              <th scope="col">Last shipment</th>
             </tr>
           </thead>
           <tbody className="text-right font-semibold tabular-nums">
@@ -131,10 +129,6 @@ export function TransportersMaster() {
                     <StatusChip tone={gst.tone}>{gst.label}</StatusChip>
                   </td>
                   <td className={transporter.vehicleCount ? undefined : "text-muted"}>{formatQuantity(transporter.vehicleCount)}</td>
-                  <td className={transporter.shipmentCount ? undefined : "text-muted"}>{formatQuantity(transporter.shipmentCount)}</td>
-                  <td className={transporter.lastShipmentDate ? undefined : "text-muted"}>
-                    {transporter.lastShipmentDate ? formatDate(transporter.lastShipmentDate) : "–"}
-                  </td>
                 </tr>
               );
             })}
@@ -143,7 +137,7 @@ export function TransportersMaster() {
         {visible.length === 0 && <p className="py-6 text-center text-[13px] text-muted">No transporters match.</p>}
       </GlassCard>
       <p className="text-[13px] text-muted">
-        A vendor shows here once it is marked GTA, has a hired vehicle on the vehicle master or has carried a shipment. Edit the name, GSTIN and GTA on the vendor record.
+        A vendor shows here once it is marked GTA or has a hired vehicle on the vehicle master. Edit the name, GSTIN and GTA on the vendor record.
       </p>
     </div>
   );

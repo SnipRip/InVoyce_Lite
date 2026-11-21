@@ -18,7 +18,7 @@ export const schemeSchema = z
     minQuantity: optional(quantity, "A quantity"),
     minValue: optional(amount, "Rupees"),
     targets: z.array(z.string()),
-    partyScope: z.enum(["ALL", "INDIA", "OVERSEAS", "SELECTED"]),
+    partyScope: z.enum(["ALL", "SELECTED"]),
     partyIds: z.array(z.string()),
     rateSources: z.array(z.enum(["SHEET", "SPECIAL", "MANUAL"])).min(1, "Pick at least one"),
     stackable: z.boolean(),

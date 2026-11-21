@@ -50,7 +50,7 @@ export class InvoicesController {
     return this.invoices.cancel(id, dto.reason);
   }
 
-  /** Attach or correct one dispatch document (IRN, challan, e-way bill, customs papers, BRC). */
+  /** Attach or correct one dispatch document (IRN, challan, e-way bill). */
   @RequireAccess(INVOICES_MODULE, 'edit')
   @Put(':id/documents/:kind')
   saveDocument(

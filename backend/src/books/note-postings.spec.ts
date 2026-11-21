@@ -5,7 +5,7 @@ import { systemLedgers } from './system-ledgers.js';
 import { imbalance } from './voucher-lines.js';
 
 const ledgers = systemLedgers([]);
-const customer = { ledger: 'Dorji Traders', group: 'Sundry Debtors' };
+const customer = { ledger: 'Sharma Traders', group: 'Sundry Debtors' };
 const vendor = { ledger: 'Tata Steel Ltd', group: 'Sundry Creditors' };
 const byLedger = (lines: Posting[]) => Object.fromEntries(lines.map((line) => [line.ledger, Math.round((line.debit - line.credit) * 100) / 100]));
 
@@ -13,20 +13,13 @@ describe('credit note postings', () => {
   it('takes back sales and output GST from the customer', () => {
     const lines = creditNotePostings({ gstAdjusted: true, regime: 'INTRA_STATE', taxable: 665, cgst: 59.85, sgst: 59.85, igst: 0, roundOff: 0.3, total: 785 }, customer, ledgers);
     expect(byLedger(lines)).toEqual({
-      'Dorji Traders': -785,
+      'Sharma Traders': -785,
       'Sales Returns': 665,
       'Output CGST': 59.85,
       'Output SGST': 59.85,
       // 784.70 rounded up: the invoice credits Round Off, its note debits it.
       'Round Off': 0.3,
     });
-    expect(imbalance(lines)).toBe(0);
-  });
-
-  it('on an export with IGST paid, turns round the refund receivable as well', () => {
-    const lines = creditNotePostings({ gstAdjusted: true, regime: 'EXPORT_IGST', taxable: 1000, cgst: 0, sgst: 0, igst: 180, roundOff: 0, total: 1180 }, customer, ledgers);
-    expect(byLedger(lines)).toMatchObject({ 'Dorji Traders': -1000, 'Sales Returns': 1000, 'Output IGST': 180 });
-    expect(byLedger(lines)).not.toHaveProperty('Export Sales - IGST');
     expect(imbalance(lines)).toBe(0);
   });
 });
@@ -56,7 +49,7 @@ describe('debit note postings', () => {
 describe('notes without GST', () => {
   it('books a discount not agreed at the sale as Discount Allowed, leaving sales and GST alone', () => {
     const lines = creditNotePostings({ gstAdjusted: false, regime: 'INTRA_STATE', taxable: 499.6, cgst: 0, sgst: 0, igst: 0, roundOff: 0.4, total: 500 }, customer, ledgers);
-    expect(byLedger(lines)).toEqual({ 'Dorji Traders': -500, 'Discount Allowed': 499.6, 'Round Off': 0.4 });
+    expect(byLedger(lines)).toEqual({ 'Sharma Traders': -500, 'Discount Allowed': 499.6, 'Round Off': 0.4 });
     expect(imbalance(lines)).toBe(0);
   });
 

@@ -13,10 +13,6 @@ const base: PartyFacts = {
   gstin: GSTIN,
   pan: null,
   placeOfSupply: null,
-  country: null,
-  foreignTaxId: null,
-  currency: 'INR',
-  exportRoute: null,
   isGta: false,
   transin: null,
   creditLimit: null,
@@ -53,15 +49,8 @@ describe('settleParty', () => {
     expect(vendor.creditLimit).toBe(5000);
   });
 
-  it('gives an overseas customer the LUT route and clears GTA for non-vendors', () => {
-    const party = settleParty({
-      ...base,
-      treatment: 'OVERSEAS',
-      gstin: null,
-      country: 'Bhutan',
-      isGta: true,
-    });
-    expect(party.exportRoute).toBe('LUT');
+  it('clears GTA for non-vendors', () => {
+    const party = settleParty({ ...base, isGta: true });
     expect(party.isGta).toBe(false);
     expect(partyProblem(party)).toBeNull();
   });
@@ -101,24 +90,7 @@ describe('partyProblem', () => {
     );
   });
 
-  it('needs a country, and no place of supply, outside India', () => {
-    const overseas = {
-      ...settled,
-      treatment: 'OVERSEAS' as const,
-      gstin: null,
-      pan: null,
-    };
-    expect(partyProblem(overseas)).toBe('Enter the country');
-    expect(partyProblem({ ...overseas, country: 'Bhutan' })).toMatch(
-      /no place of supply/,
-    );
-  });
-
-  it('bills in BTN only outside India', () => {
-    expect(partyProblem({ ...settled, currency: 'BTN' })).toMatch(/BTN/);
-  });
-
-  it('needs a known state code inside India', () => {
+  it('needs a known state code', () => {
     const consumer = {
       ...settled,
       treatment: 'CONSUMER' as const,

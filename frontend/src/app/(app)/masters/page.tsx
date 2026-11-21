@@ -1,4 +1,4 @@
-import { BadgeCheck, BookOpen, Building2, Container, Globe, HandCoins, Hash, Landmark, ListOrdered, MessageCircle, Package, Ruler, Tag, Truck, Users, Wallet, Warehouse } from "lucide-react";
+import { BadgeCheck, BookOpen, Building, Building2, Container, HandCoins, Hash, Landmark, ListOrdered, MessageCircle, Package, Ruler, Tag, Truck, Users, Wallet, Warehouse } from "lucide-react";
 import type { Metadata } from "next";
 import { SampleDataNotice } from "@/components/ui/sample-data-notice";
 import { HSN_CODES_PATH } from "@/features/hsn/hsn-api";
@@ -11,7 +11,6 @@ import { MastersHub } from "@/features/masters/masters-hub";
 import { CONFIGURED_SERIES_PATH } from "@/features/number-series/number-series-api";
 import { PARTIES_PATH } from "@/features/parties/parties-api";
 import { SPECIAL_RATES_PATH } from "@/features/rates/rates-api";
-import { LUTS_PATH } from "@/features/tax-export/luts-api";
 import { templates } from "@/features/whatsapp/sample-data";
 
 export const metadata: Metadata = { title: "Masters" };
@@ -19,13 +18,13 @@ export const metadata: Metadata = { title: "Masters" };
 export default function MastersPage() {
   return (
     <>
-      <SampleDataNotice>Customers, vendors, items, brands, units, godowns, HSN codes, special rates, the LUT register, number series, bank & cash accounts, loans, expense & income heads, transporters and vehicles are live. The other counts are still sample data.</SampleDataNotice>
+      <SampleDataNotice>Customers, vendors, items, brands, units, godowns, HSN codes, special rates, number series, bank & cash accounts, loans, expense & income heads, transporters and vehicles are live. The other counts are still sample data.</SampleDataNotice>
       <MastersHub
         groups={[
           {
             label: "Parties",
             cards: [
-              { href: "/customers", title: "Customers", icon: Users, description: "GST treatment, place of supply, Bhutan buyers with export route and credit.", count: <LiveCount path={`${PARTIES_PATH}?role=customer`} noun={["customer", "customers"]} /> },
+              { href: "/customers", title: "Customers", icon: Users, description: "GST treatment, place of supply and credit.", count: <LiveCount path={`${PARTIES_PATH}?role=customer`} noun={["customer", "customers"]} /> },
               { href: "/vendors", title: "Vendors", icon: Building2, description: "Who gives a GST bill and who does not, composition and transporters, MSME and bank details.", count: <LiveCount path={`${PARTIES_PATH}?role=vendor`} noun={["vendor", "vendors"]} /> },
               { href: "/masters/transporters", title: "Transporters", icon: Truck, description: "Transporter ID for e-way bills, and whether they bill freight under reverse charge.", count: <LiveCount path={TRANSPORTERS_PATH} noun={["transporter", "transporters"]} /> },
               { href: "/masters/vehicles", title: "Vehicles", icon: Container, description: "Own and hired trucks with capacity and driver contact.", count: <LiveCount path={VEHICLES_PATH} noun={["vehicle", "vehicles"]} /> },
@@ -46,10 +45,10 @@ export default function MastersPage() {
             ],
           },
           {
-            label: "Tax and export",
+            label: "Company and tax",
             cards: [
               { href: "/masters/hsn", title: "HSN / SAC codes", icon: Hash, description: "Every code with its GST rate. Items take their rate from here.", count: <LiveCount path={HSN_CODES_PATH} noun={["code", "codes"]} /> },
-              { href: "/masters/tax-export", title: "GST & export setup", icon: Globe, description: "Our GST state, LUT register, IEC, AD code and the documents each export needs.", count: <LiveCount path={LUTS_PATH} noun={["LUT on record", "LUTs on record"]} /> },
+              { href: "/masters/company", title: "Company & GST setup", icon: Building, description: "Our legal name, GST registration and state, and how GST is decided." },
             ],
           },
           {

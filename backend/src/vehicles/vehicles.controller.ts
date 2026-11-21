@@ -7,7 +7,7 @@ import { VehiclesService } from './vehicles.service.js';
 
 export const VEHICLES_MODULE = '/masters/vehicles';
 
-// Reading is open to every signed-in user (the shipment form picks from it).
+// Reading is open to every signed-in user (invoice and transfer forms pick from it).
 @Controller('vehicles')
 export class VehiclesController {
   constructor(private readonly vehicles: VehiclesService) {}

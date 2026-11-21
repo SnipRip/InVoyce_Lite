@@ -15,6 +15,6 @@ export interface VehicleView {
   driverPhone: string | null;
   notes: string | null;
   isArchived: boolean;
-  /** Shipments that carried it: such a vehicle is archived, not deleted. */
-  shipmentCount: number;
+  /** Invoices and stock transfers that carried it: such a vehicle is archived, not deleted. */
+  useCount: number;
 }

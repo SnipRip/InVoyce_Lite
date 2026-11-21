@@ -95,8 +95,8 @@ export function NumberSeriesScreen() {
           ))}
         </GlassTable>
         <p className="text-xs font-semibold text-muted">
-          Every number is kept, cancelled ones too, and never given twice: GST documents within the financial year (local and
-          export invoices together, as the e-invoice portal checks them), codes for ever.
+          Every number is kept, cancelled ones too, and never given twice: GST documents within the financial year, codes for
+          ever.
         </p>
       </GlassCard>
 

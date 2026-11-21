@@ -509,7 +509,7 @@ export function BillForm({ vendors, catalog, purchases, godowns, company, initia
                     <div className="flex flex-col gap-1">
                       <span className="text-xs font-medium text-muted">Billed from</span>
                       <p className="glass-inset flex h-9 items-center rounded-(--radius-control) px-3 text-sm font-medium text-ink-soft">
-                        {vendor ? (vendor.treatment === "overseas" ? "Outside India" : (stateName(sourceOfSupply) ?? "—")) : "Pick the vendor"}
+                        {vendor ? (stateName(sourceOfSupply) ?? "—") : "Pick the vendor"}
                       </p>
                     </div>
                   )}

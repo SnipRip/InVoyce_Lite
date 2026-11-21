@@ -140,7 +140,7 @@ const NATURES = {
   INDIRECT_INCOME: HEAD_GROUPS.INDIRECT_INCOME,
 };
 const HEAD_GST = { FOLLOWS_BILL: "Follows the bill's rate", OWN_RATE: 'Its own rate', NONE: 'No GST' };
-const ALLOCATIONS = { ITEM_COST: 'Item cost (landed cost)', INVOICE: 'One invoice', SHIPMENT: 'One shipment', OVERHEAD: 'General overhead' };
+const ALLOCATIONS = { ITEM_COST: 'Item cost (landed cost)', INVOICE: 'One invoice', OVERHEAD: 'General overhead' };
 
 export function accountHeadsImporter(heads: AccountHeadsService, prisma: PrismaService): MasterImporter<AccountHead> {
   const columns: ImportColumn<AccountHead>[] = [

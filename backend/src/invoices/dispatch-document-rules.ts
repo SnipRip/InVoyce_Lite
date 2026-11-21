@@ -2,14 +2,12 @@
 // frontend's features/invoices/dispatch-documents.ts has the same fields for
 // the form. A saved document's details are cleaned here: amounts and weights
 // become numbers, codes are upper-cased, blanks are dropped.
-import type { DispatchDocumentKind, GstTreatment, InvoiceKind } from '../generated/prisma/enums.js';
+import type { DispatchDocumentKind, GstTreatment } from '../generated/prisma/enums.js';
 
-type FieldType = 'text' | 'amount' | 'count' | 'kg' | 'date' | 'vehicle' | 'port' | 'ack';
+type FieldType = 'text' | 'amount' | 'date' | 'vehicle' | 'ack';
 
 interface DocumentRule {
   name: string;
-  /** Which invoices take it. */
-  for: InvoiceKind[];
   numberPattern?: RegExp;
   numberMessage?: string;
   /** IRN in lower case; other numbers as typed (trimmed). */
@@ -20,7 +18,6 @@ interface DocumentRule {
 export const DOCUMENT_RULES: Record<DispatchDocumentKind, DocumentRule> = {
   E_INVOICE: {
     name: 'E-invoice (IRN)',
-    for: ['LOCAL', 'EXPORT'],
     numberPattern: /^[0-9a-f]{64}$/,
     numberMessage: 'The IRN is 64 letters (a–f) and digits',
     normalise: (number) => number.toLowerCase(),
@@ -28,58 +25,42 @@ export const DOCUMENT_RULES: Record<DispatchDocumentKind, DocumentRule> = {
   },
   LORRY_CHALLAN: {
     name: 'Lorry hire challan',
-    for: ['LOCAL', 'EXPORT'],
     fields: { transporter: 'text', vehicle: 'vehicle', freight: 'amount' },
   },
   EWAY_BILL: {
     name: 'E-way bill',
-    for: ['LOCAL', 'EXPORT'],
     numberPattern: /^\d{12}$/,
     numberMessage: 'An e-way bill number is 12 digits',
     fields: { validUntil: 'date' },
   },
-  CUSTOMS_INVOICE: { name: 'Customs invoice', for: ['EXPORT'], fields: { fobValue: 'amount' } },
-  PACKING_LIST: { name: 'Packing list', for: ['EXPORT'], fields: { packages: 'count', grossKg: 'kg' } },
-  SHIPPING_BILL: {
-    name: 'Shipping bill',
-    for: ['EXPORT'],
-    numberPattern: /^\d{6,8}$/,
-    numberMessage: 'A shipping bill number is 6 to 8 digits (usually 7)',
-    fields: { portCode: 'port' },
-  },
-  LEO: { name: 'LEO', for: ['EXPORT'], fields: {} },
-  BRC: { name: 'BRC / e-BRC', for: ['EXPORT'], fields: { amount: 'amount', bank: 'text' } },
 };
 
 const FIELD_FORMATS: Record<FieldType, { pattern: RegExp; message: string }> = {
   text: { pattern: /^.{1,120}$/s, message: 'is up to 120 characters' },
   amount: { pattern: /^\d{1,12}(\.\d{1,2})?$/, message: 'is an amount in rupees' },
-  count: { pattern: /^\d{1,6}$/, message: 'is a whole number' },
-  kg: { pattern: /^\d{1,9}(\.\d{1,3})?$/, message: 'is a weight in kilograms' },
   date: { pattern: /^\d{4}-\d{2}-\d{2}$/, message: 'is a date (YYYY-MM-DD)' },
   vehicle: { pattern: /^[A-Z]{2}\d{1,2}[A-Z]{0,3}\d{4}$/, message: 'is like WB73E1234, no spaces' },
-  port: { pattern: /^[A-Z0-9]{6}$/, message: 'is 6 letters and digits, like INJIGB' },
   ack: { pattern: /^\d{15}$/, message: 'is 15 digits' },
 };
 
-/** The name inside a sentence: "e-way bill", but "LEO" and "BRC / e-BRC" stay as they are. */
+/** The name inside a sentence: "e-way bill"; a name starting with an abbreviation stays as it is. */
 export const nameInText = (kind: DispatchDocumentKind) => {
   const { name } = DOCUMENT_RULES[kind];
   return /^[A-Z]{2}/.test(name) ? name : name.charAt(0).toLowerCase() + name.slice(1);
 };
 
-const NUMERIC: FieldType[] = ['amount', 'count', 'kg'];
-const UPPER: FieldType[] = ['vehicle', 'port'];
+const NUMERIC: FieldType[] = ['amount'];
+const UPPER: FieldType[] = ['vehicle'];
 
-/** B2B invoices and exports get an IRN (turnover above ₹5 crore); consumers and unregistered buyers do not. */
-export const needsEinvoice = (kind: InvoiceKind, treatment: GstTreatment) =>
-  kind === 'EXPORT' || treatment === 'REGISTERED' || treatment === 'COMPOSITION' || treatment === 'SEZ';
+/** Goods above this value move under an e-way bill (CGST rule 138). */
+export const EWAY_BILL_LIMIT = 50_000;
+
+/** B2B invoices get an IRN (turnover above ₹5 crore); consumers and unregistered buyers do not. */
+export const needsEinvoice = (treatment: GstTreatment) => treatment === 'REGISTERED' || treatment === 'COMPOSITION';
 
 /** Can this kind of paper be attached to this invoice at all? */
-export function documentKindProblem(kind: DispatchDocumentKind, invoiceKind: InvoiceKind, treatment: GstTreatment): string | null {
-  const rule = DOCUMENT_RULES[kind];
-  if (!rule.for.includes(invoiceKind)) return `A ${nameInText(kind)} is for export invoices only`;
-  if (kind === 'E_INVOICE' && !needsEinvoice(invoiceKind, treatment)) return 'A sale to a consumer or an unregistered buyer has no IRN';
+export function documentKindProblem(kind: DispatchDocumentKind, treatment: GstTreatment): string | null {
+  if (kind === 'E_INVOICE' && !needsEinvoice(treatment)) return 'A sale to a consumer or an unregistered buyer has no IRN';
   return null;
 }
 

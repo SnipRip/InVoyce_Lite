@@ -72,6 +72,5 @@ export function issuerOf(profile: CompanyProfileView): Issuer {
     registration: profile.registration,
     enforceHsnGstRate: profile.enforceHsnGstRate,
     gstin: profile.gstin ?? undefined,
-    iec: profile.iec ?? undefined,
   };
 }

@@ -8,14 +8,13 @@ import { EWAY_BILL_LIMIT, type InvoiceTotals } from "./invoice-rules";
 interface InvoiceTotalsCardProps {
   totals: InvoiceTotals;
   tax: TaxDecision;
-  currency: "INR" | "BTN";
   /** What schemes took off (shown above the taxable value when there is some). */
   schemeDiscount?: number;
 }
 
 // Running totals beside the invoice form: taxable value, each GST head, round
 // off, grand total in figures and words, and whether an e-way bill is due.
-export function InvoiceTotalsCard({ totals, tax, currency, schemeDiscount = 0 }: InvoiceTotalsCardProps) {
+export function InvoiceTotalsCard({ totals, tax, schemeDiscount = 0 }: InvoiceTotalsCardProps) {
   const row = (label: string, value: number, strong = false) => (
     <div key={label} className={strong ? "flex justify-between text-lg font-semibold" : "flex justify-between text-sm font-semibold"}>
       <dt>{label}</dt>
@@ -44,14 +43,14 @@ export function InvoiceTotalsCard({ totals, tax, currency, schemeDiscount = 0 }:
         {Object.keys(totals.taxByName).length === 0 && (
           <div className="flex justify-between text-sm font-semibold text-muted">
             <dt>GST</dt>
-            <dd>{tax.regime === "export-lut" ? "0, under LUT" : "None"}</dd>
+            <dd>None</dd>
           </div>
         )}
         {totals.roundOff !== 0 && row("Round off", totals.roundOff)}
         <div className="my-1 border-t border-line" />
         {row("Invoice total", totals.grandTotal, true)}
       </dl>
-      <p className="text-xs font-semibold text-ink-soft">{amountInWords(totals.grandTotal, currency)}</p>
+      <p className="text-xs font-semibold text-ink-soft">{amountInWords(totals.grandTotal)}</p>
       <p className="text-xs font-semibold text-muted">{tax.detail}</p>
       {totals.grandTotal > EWAY_BILL_LIMIT && (
         <StatusChip tone="warning">Above ₹50,000: an e-way bill is needed to move the goods</StatusChip>

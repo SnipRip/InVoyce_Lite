@@ -178,7 +178,6 @@ function OpenTable({ documents, today, direction }: { documents: OpenDocumentVie
                 <Link href={`/payments/ledger/${document.partyId}`} className="font-semibold hover:text-brand hover:underline">
                   {document.partyName}
                 </Link>
-                {document.flag === "EXPORT" && <div className="text-xs text-muted">Export: BRC on receipt</div>}
                 {document.flag === "MSME" && today && document.dueDate && (
                   <div className="text-xs text-warning-strong">MSME · {Math.max(msmeDaysLeft(document, today), 0)} days left of 45</div>
                 )}
@@ -261,7 +260,6 @@ function SettlementTable({ settlements }: { settlements: SettlementView[] }) {
                 ))}
                 {!settlement.cancelledAt && settlement.refunded > 0 && <div className="text-muted">Refunded {formatInr(settlement.refunded)}</div>}
                 {!settlement.cancelledAt && settlement.unapplied > 0 && <div className="text-brand-strong">Advance {formatInr(settlement.unapplied)}</div>}
-                {settlement.brc && <StatusChip tone="success">BRC {settlement.brc.number}</StatusChip>}
               </td>
             </tr>
           ))}

@@ -8,8 +8,8 @@ import { CardTitle, GlassCard } from "@/components/ui/glass-card";
 import { GlassModal } from "@/components/ui/glass-modal";
 import { StatusChip } from "@/components/ui/status-chip";
 import { AttachDocumentForm } from "./attach-document-form";
-import { documentsFor, type DispatchDocumentType } from "./dispatch-documents";
-import { isDocumentRequired, realisationDueDate } from "./invoice-rules";
+import { DISPATCH_DOCUMENTS, type DispatchDocumentType } from "./dispatch-documents";
+import { isDocumentRequired } from "./invoice-rules";
 import type { DispatchDocument, DispatchDocumentKind, Invoice } from "./types";
 import { formatDate } from "@/lib/format";
 import { DocumentFiles } from "./document-files";
@@ -17,7 +17,7 @@ import { DocumentFiles } from "./document-files";
 interface DispatchDocumentsPanelProps {
   invoice: Invoice;
   grandTotal: number;
-  /** B2B and export invoices need an IRN; see needsEinvoice. */
+  /** B2B invoices need an IRN; see needsEinvoice. */
   einvoice: boolean;
   /** Saved on the server; a refusal throws and shows on the form. */
   onSave: (kind: DispatchDocumentKind, document: DispatchDocument) => Promise<void>;
@@ -26,15 +26,14 @@ interface DispatchDocumentsPanelProps {
   onFilesChanged: () => Promise<void>;
 }
 
-const STAGES = ["E-invoice", "Dispatch", "Customs", "Payment"] as const;
+const STAGES = ["E-invoice", "Dispatch"] as const;
 
-// Everything that follows the bill, in the order it happens. An export is
-// complete when every row is ticked; a local invoice only needs the e-way
-// bill above ₹50,000.
+// Everything that follows the bill, in the order it happens: the IRN on a
+// B2B invoice, and the e-way bill above ₹50,000.
 export function DispatchDocumentsPanel({ invoice, grandTotal, einvoice, onSave, onRemove, onFilesChanged }: DispatchDocumentsPanelProps) {
   const [editing, setEditing] = useState<DispatchDocumentType | null>(null);
-  const types = documentsFor(invoice.kind);
-  const isRequired = (type: DispatchDocumentType) => isDocumentRequired(type.kind, invoice, grandTotal, einvoice);
+  const types = DISPATCH_DOCUMENTS;
+  const isRequired = (type: DispatchDocumentType) => isDocumentRequired(type.kind, grandTotal, einvoice);
   const required = types.filter(isRequired);
   const done = required.filter((type) => invoice.documents[type.kind]).length;
   const canAttach = invoice.status === "issued";
@@ -42,15 +41,12 @@ export function DispatchDocumentsPanel({ invoice, grandTotal, einvoice, onSave, 
   const suggestions: Record<string, string> = {
     date: invoice.date,
     vehicle: invoice.vehicleNumber ?? "",
-    fobValue: invoice.kind === "export" ? String(grandTotal) : "",
-    amount: String(grandTotal),
-    portCode: "INJIGB",
   };
 
   return (
     <GlassCard className="flex flex-col gap-3.5">
       <div className="flex flex-wrap items-center gap-2">
-        <CardTitle>{invoice.kind === "export" ? "Export documents" : "Transport documents"}</CardTitle>
+        <CardTitle>Transport documents</CardTitle>
         <StatusChip tone={done === required.length ? "success" : "warning"}>
           {done} of {required.length} attached
         </StatusChip>
@@ -95,11 +91,6 @@ export function DispatchDocumentsPanel({ invoice, grandTotal, einvoice, onSave, 
                       )}
                       {document ? null : (
                         <span className="text-xs font-medium text-muted">{type.purpose}</span>
-                      )}
-                      {type.kind === "brc" && !document && invoice.status === "issued" && (
-                        <span className="text-xs font-semibold text-warning-strong">
-                          Payment due in by {formatDate(realisationDueDate(invoice))} (FEMA period; confirm with the bank)
-                        </span>
                       )}
                     </div>
                     <Button

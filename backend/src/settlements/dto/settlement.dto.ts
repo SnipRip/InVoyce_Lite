@@ -8,7 +8,7 @@ import { PaymentMode, SettlementDirection } from '../../generated/prisma/enums.j
 export const MAX_ALLOCATIONS = 200;
 
 // Field formats only; settlements.service.ts checks the party, the account,
-// the balances and the BRC.
+// the balances.
 export class AllocationDto {
   /**
    * INVOICE for receipts, BILL or EXPENSE (bought on credit) for payments,
@@ -64,16 +64,6 @@ export class SettlementDto {
   @IsString()
   @MaxLength(60)
   reference?: string | null;
-
-  @Transform(trimToNull)
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  brcNumber?: string | null;
-
-  @IsOptional()
-  @IsIsoDate('Pick the BRC date')
-  brcDate?: string | null;
 
   @Transform(trimToNull)
   @IsOptional()

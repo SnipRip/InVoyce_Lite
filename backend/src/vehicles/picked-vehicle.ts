@@ -1,4 +1,4 @@
-// The vehicle a shipment, invoice or stock transfer carries: picked from the
+// The vehicle an invoice or stock transfer carries: picked from the
 // vehicle master or typed. A picked one is locked FOR SHARE (it cannot be
 // renamed or archived under the save) and its master number is recorded.
 import { BadRequestException } from '@nestjs/common';

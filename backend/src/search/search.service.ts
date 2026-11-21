@@ -9,7 +9,6 @@ import { ITEMS_MODULE } from '../items/items-module-key.js';
 import { PURCHASE_BILLS_MODULE } from '../purchases/purchases.controllers.js';
 import { QUOTATIONS_MODULE } from '../quotations/quotations.controller.js';
 import { PAYMENTS_MODULE } from '../settlements/settlements.controller.js';
-import { SHIPMENTS_MODULE } from '../shipments/shipments.controller.js';
 import { TRANSFERS_MODULE } from '../stock-moves/stock-moves.controllers.js';
 import { VEHICLES_MODULE } from '../vehicles/vehicles.controller.js';
 import { quotationLabel } from '../sale-pricing/sale-rules.js';
@@ -24,9 +23,9 @@ const VENDORS_MODULE = '/vendors';
 const party = (word: string) => ({ party: { displayName: has(word) } });
 const joined = (...parts: (string | null | undefined)[]) => parts.filter(Boolean).join(' · ');
 
-// Global search (SOW 17): items, customers, vendors, quotations, invoices and
-// their dispatch document numbers (IRN, e-way bill, Shipping Bill, LEO …),
-// vendor bills, shipments, stock transfers, receipts and payments, expenses
+// Global search: items, customers, vendors, quotations, invoices and
+// their dispatch document numbers (IRN, e-way bill, lorry challan),
+// vendor bills, stock transfers, receipts and payments, expenses
 // and vehicles. Every word of the query must appear in one of a record's
 // fields. Each kind is searched only when the user's role may open the
 // screen its results link to (the check RequireAccess makes there).
@@ -107,20 +106,6 @@ export class SearchService {
           title: row.reference,
           detail: joined(row.vendor.displayName, row.vendorBillNumber, row.ewayBillNumber ? `e-way bill ${row.ewayBillNumber}` : null),
           href: `/purchases/${row.id}`,
-        }));
-      }),
-      when(SHIPMENTS_MODULE, async () => {
-        const rows = await this.prisma.shipment.findMany({
-          where: everyWord<Prisma.ShipmentWhereInput>(words, [(w) => ({ number: has(w) }), (w) => ({ vehicleNumber: has(w) }), (w) => ({ sealNumber: has(w) }), (w) => ({ destination: has(w) }), party]),
-          orderBy: { date: 'desc' },
-          take,
-          select: { id: true, number: true, vehicleNumber: true, destination: true, cancelledAt: true, party: { select: { displayName: true } } },
-        });
-        return rows.map((row) => ({
-          kind: 'Shipment',
-          title: row.number,
-          detail: joined(`${row.vehicleNumber} to ${row.destination}`, row.party.displayName, row.cancelledAt ? 'cancelled' : null),
-          href: `/shipments/${row.id}`,
         }));
       }),
       when(TRANSFERS_MODULE, async () => {

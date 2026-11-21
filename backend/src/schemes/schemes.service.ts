@@ -146,7 +146,7 @@ export class SchemesService {
       if (!item) throw new BadRequestException('An item on the document does not exist');
       return { ...line, item };
     });
-    const buyer: SchemeParty | null = party && { id: party.id, overseas: party.treatment === 'OVERSEAS' || party.treatment === 'SEZ' };
+    const buyer: SchemeParty | null = party && { id: party.id };
     return applySchemes(schemes.map(toSchemeView), schemeLines, buyer, date);
   }
 

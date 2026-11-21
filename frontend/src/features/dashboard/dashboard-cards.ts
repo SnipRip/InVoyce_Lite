@@ -3,11 +3,10 @@
 // quotations) is decided in the card from `useToday`.
 import { quotationLabel } from "@/features/quotations/quotation-rules";
 import type { QuotationStatus } from "@/features/quotations/types";
-import { documentName, STATUS_OF } from "@/features/shipments/shipments-api";
-import { stageLabel } from "@/features/shipments/shipment-rules";
+import { documentName } from "@/features/documents/documents-api";
 import { formatDayMonth, formatInr } from "@/lib/format";
 import type { DashboardView } from "@/types/dashboard";
-import type { AttentionItem, Kpi, PendingQuotation, ShipmentRow, TradingSeries, TradingWeek } from "./types";
+import type { AttentionItem, Kpi, PendingQuotation, TradingSeries, TradingWeek } from "./types";
 
 const lakh = (amount: number) => Math.round(amount / 1000) / 100;
 const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
@@ -18,7 +17,7 @@ export function dashboardKpis(view: DashboardView): Kpi[] {
     !!view.sales && {
       label: "Sales",
       value: view.sales.total,
-      note: `${plural(view.sales.invoices, "invoice")}, ${view.sales.exportInvoices} to Bhutan · before GST`,
+      note: `${plural(view.sales.invoices, "invoice")} · before GST`,
       noteTone: "neutral",
       href: "/invoices",
     },
@@ -70,12 +69,12 @@ export function attentionItems(view: DashboardView): AttentionItem[] {
   const { documents, stock, purchases, profit } = view;
   const items: (AttentionItem | false)[] = [
     !!documents?.missing && {
-      heading: `Documents · ${documents.missing} required, not attached${documents.holdingTrucks ? ` · ${documents.holdingTrucks} holding a truck` : ""}`,
+      heading: `Documents · ${documents.missing} required, not attached`,
       detail: andMore(
         documents.first.map((paper) => `${documentName(paper.kind)} on ${paper.invoiceNumber}`),
         documents.missing,
       ),
-      tone: documents.holdingTrucks ? "danger" : "warning",
+      tone: "warning",
       href: "/documents",
     },
     !!stock?.low && {
@@ -110,24 +109,3 @@ export const pendingQuotations = (view: DashboardView): PendingQuotation[] =>
     status: quotation.status.toLowerCase() as QuotationStatus,
   }));
 
-export function shipmentSummary(shipments: NonNullable<DashboardView["shipments"]>): { counts: { label: string; count: number }[]; rows: ShipmentRow[] } {
-  return {
-    counts: [
-      { label: "Planned or loading", count: shipments.counts.planned },
-      { label: "On the road or at border", count: shipments.counts.onTheRoad },
-      { label: "Cleared or delivered", count: shipments.counts.done },
-    ],
-    rows: shipments.latest.map((shipment) => {
-      const next = shipment.nextStage ? stageLabel(STATUS_OF[shipment.nextStage]).toLowerCase() : null;
-      const papers = [...new Set(shipment.waitingFor.map(documentName))];
-      return {
-        id: shipment.id,
-        number: shipment.number,
-        vehicle: shipment.vehicleNumber,
-        status: stageLabel(STATUS_OF[shipment.stage]),
-        tone: !next ? "success" : papers.length ? "warning" : "brand",
-        detail: `${shipment.partyName} · ${!next ? "delivered" : papers.length ? `waiting for ${papers.join(", ")}` : `ready for ${next}`}`,
-      };
-    }),
-  };
-}

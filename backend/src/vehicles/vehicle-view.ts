@@ -4,7 +4,7 @@ import type { Prisma } from '../generated/prisma/client.js';
 
 export const vehicleInclude = {
   transporter: { select: { displayName: true } },
-  _count: { select: { shipments: true } },
+  _count: { select: { invoices: true, stockTransfers: true } },
 } as const satisfies Prisma.VehicleInclude;
 
 type VehicleRow = Prisma.VehicleGetPayload<{ include: typeof vehicleInclude }>;
@@ -13,8 +13,8 @@ export const toVehicleView = ({ transporter, _count, capacityTons, ...vehicle }:
   ...vehicle,
   capacityTons: capacityTons === null ? null : toNumber(capacityTons),
   transporterName: transporter?.displayName ?? null,
-  /** Shipments that carried it (cancelled ones too): a used vehicle is archived, not deleted. */
-  shipmentCount: _count.shipments,
+  /** Invoices and stock transfers that carried it (cancelled ones too): a used vehicle is archived, not deleted. */
+  useCount: _count.invoices + _count.stockTransfers,
 });
 
 export type VehicleView = ReturnType<typeof toVehicleView>;

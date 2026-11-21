@@ -16,7 +16,6 @@ import type { AccountHead, HeadAllocation, HeadGst, HeadNature } from "./types";
 export const ALLOCATIONS: { value: HeadAllocation; label: string; hint: string }[] = [
   { value: "item-cost", label: "Item cost (landed cost)", hint: "Spread over the items of a purchase" },
   { value: "invoice", label: "One invoice", hint: "Reduces the profit of one sale" },
-  { value: "shipment", label: "One shipment", hint: "Reduces the profit of one export shipment" },
   { value: "overhead", label: "General overhead", hint: "Not tied to one sale; shown in P&L only" },
 ];
 

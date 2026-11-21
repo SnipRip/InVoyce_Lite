@@ -27,8 +27,6 @@ export const invoiceSchema = z.object({
   placeOfSupply: z.string(),
   shipToLine: z.string().max(160),
   shipToCity: z.string().max(60),
-  exportRoute: z.enum(["lut", "igst"]),
-  currency: z.enum(["INR", "BTN"]),
   /** False: a local invoice without GST (a bill of supply). */
   gstApplicable: z.boolean(),
   /** Shown read-only when picked from the master; checked only when typed. */

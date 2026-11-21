@@ -44,7 +44,7 @@ export function QuotationDocument({ quotation, party, issuer, tax, totals }: Quo
       <section className="mt-3">
         <p className="text-[11px] font-semibold text-muted">To</p>
         <p className="font-semibold">{party.legalName ?? party.displayName}</p>
-        <p>{[party.billing.line1, party.billing.city, party.billing.stateCode ? stateName(party.billing.stateCode) : party.billing.country].filter(Boolean).join(", ")}</p>
+        <p>{[party.billing.line1, party.billing.city, party.billing.stateCode ? stateName(party.billing.stateCode) : undefined].filter(Boolean).join(", ")}</p>
         {party.gstin && <p>GSTIN {party.gstin}</p>}
       </section>
 
@@ -123,7 +123,7 @@ export function QuotationDocument({ quotation, party, issuer, tax, totals }: Quo
           {withGst && Object.keys(totals.taxByName).length === 0 && (
             <div className="flex justify-between gap-3.5">
               <dt>GST</dt>
-              <dd>{tax.regime === "export-lut" ? "Nil, under LUT" : "Nil"}</dd>
+              <dd>Nil</dd>
             </div>
           )}
           {totals.roundOff !== 0 && (
@@ -138,7 +138,7 @@ export function QuotationDocument({ quotation, party, issuer, tax, totals }: Quo
           </div>
         </dl>
       </div>
-      <p className="mt-2 font-semibold">{amountInWords(totals.grandTotal, party.currency)}</p>
+      <p className="mt-2 font-semibold">{amountInWords(totals.grandTotal)}</p>
       <p className="mt-6 text-right font-semibold">For {issuer.legalName}</p>
     </article>
   );

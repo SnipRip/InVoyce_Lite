@@ -24,7 +24,7 @@ type Field = FieldPath<PartyFormValues>;
 /** The fields each step checks before the next one opens. */
 const STEP_FIELDS: Field[][] = [
   ["roles", "kind", "displayName", "contactPerson", "phone", "email"],
-  ["treatment", "gstin", "pan", "placeOfSupply", "country", "foreignTaxId", "addressLine", "city", "pin"],
+  ["treatment", "gstin", "pan", "placeOfSupply", "addressLine", "city", "pin"],
   ["creditDays", "openingBalance", "creditLimit", "transin"],
 ];
 
@@ -68,9 +68,8 @@ export function QuickAddPartyDialog({ open, onOpenChange, role, onCreated }: Qui
   });
   const isCustomer = roles.includes("customer");
   const isVendor = roles.includes("vendor");
-  const overseas = treatment === "overseas";
   const gstinCheck = gstin ? checkGstin(gstin) : undefined;
-  const pickedFromGstin = needsGstin(treatment) && treatment !== "sez" && Boolean(gstinCheck?.valid);
+  const pickedFromGstin = needsGstin(treatment) && Boolean(gstinCheck?.valid);
 
   const toggleRole = (toggled: PartyRole) =>
     setValue("roles", roles.includes(toggled) ? roles.filter((existing) => existing !== toggled) : [...roles, toggled], { shouldValidate: true });
@@ -80,10 +79,7 @@ export function QuickAddPartyDialog({ open, onOpenChange, role, onCreated }: Qui
     setValue("gstin", upper);
     if (checkGstin(upper).valid) {
       setValue("pan", gstinPan(upper));
-      if (treatment !== "sez")
-        setValue("placeOfSupply", gstinStateCode(upper), {
-          shouldValidate: true,
-        });
+      setValue("placeOfSupply", gstinStateCode(upper), { shouldValidate: true });
     }
   };
 
@@ -177,13 +173,7 @@ export function QuickAddPartyDialog({ open, onOpenChange, role, onCreated }: Qui
           <TextField label="PAN" error={errors.pan?.message} {...register("pan")} />
         </>
       )}
-      {overseas ? (
-        <>
-          <TextField label="Country" placeholder="Bhutan" error={errors.country?.message} {...register("country")} />
-          <TextField label="Their tax ID" placeholder="Bhutan TPN or equivalent" error={errors.foreignTaxId?.message} {...register("foreignTaxId")} />
-        </>
-      ) : (
-        <Controller
+      <Controller
           control={control}
           name="placeOfSupply"
           render={({ field }) => (
@@ -199,10 +189,9 @@ export function QuickAddPartyDialog({ open, onOpenChange, role, onCreated }: Qui
             </div>
           )}
         />
-      )}
       <TextField label="Street / area" error={errors.addressLine?.message} {...register("addressLine")} />
       <TextField label="City / town" error={errors.city?.message} {...register("city")} />
-      {!overseas && <TextField label="PIN code" inputMode="numeric" error={errors.pin?.message} {...register("pin")} />}
+      <TextField label="PIN code" inputMode="numeric" error={errors.pin?.message} {...register("pin")} />
     </>
   );
 
@@ -231,7 +220,7 @@ export function QuickAddPartyDialog({ open, onOpenChange, role, onCreated }: Qui
           </FilterGroup>
         </div>
       )}
-      {isVendor && !needsGstin(treatment) && !overseas && (
+      {isVendor && !needsGstin(treatment) && (
         <TextField label="TRANSIN (transporter ID)" hint="Only for a transporter without a GSTIN" error={errors.transin?.message} {...register("transin")} />
       )}
       <p className={`${fullWidth} text-xs font-medium text-muted`}>

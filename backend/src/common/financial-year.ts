@@ -1,5 +1,5 @@
-// Indian financial years run 1 April to 31 March. LUTs and number series are
-// both kept per year.
+// Indian financial years run 1 April to 31 March. Number series are kept
+// per year.
 
 export const FINANCIAL_YEAR_PATTERN = /^\d{4}-\d{2}$/;
 

@@ -19,20 +19,13 @@ export interface PartyFacts {
   gstin: string | null;
   pan: string | null;
   placeOfSupply: string | null;
-  country: string | null;
-  foreignTaxId: string | null;
-  currency: 'INR' | 'BTN';
-  exportRoute: 'LUT' | 'IGST' | null;
   isGta: boolean;
   transin: string | null;
   creditLimit: number | null;
   openingBalanceSide: BalanceSide;
 }
 
-export const needsGstin = (treatment: GstTreatment) =>
-  treatment === 'REGISTERED' ||
-  treatment === 'COMPOSITION' ||
-  treatment === 'SEZ';
+export const needsGstin = (treatment: GstTreatment) => treatment === 'REGISTERED' || treatment === 'COMPOSITION';
 
 /** The sidebar modules a party belongs to, for permission checks. */
 export const partyModules = (party: {
@@ -50,22 +43,13 @@ export const partyModules = (party: {
  */
 export function settleParty<T extends PartyFacts>(party: T): T {
   const settled = { ...party };
-  const overseas = party.treatment === 'OVERSEAS';
   if (
     needsGstin(party.treatment) &&
     party.gstin &&
     !gstinProblem(party.gstin)
   ) {
     settled.pan ??= gstinPan(party.gstin);
-    // An SEZ unit's place of supply is where the SEZ is, which the GSTIN gives too.
     settled.placeOfSupply ??= gstinStateCode(party.gstin);
-  }
-  if (overseas) {
-    settled.exportRoute = party.isCustomer
-      ? (party.exportRoute ?? 'LUT')
-      : null;
-  } else {
-    settled.exportRoute = null;
   }
   if (!party.isVendor) {
     settled.isGta = false;
@@ -88,14 +72,11 @@ export function partyProblem(party: PartyFacts): string | null {
     if (problem) return problem;
     if (party.pan && party.pan !== gstinPan(party.gstin))
       return 'The PAN does not match the GSTIN';
-    if (
-      party.treatment !== 'SEZ' &&
-      party.placeOfSupply !== gstinStateCode(party.gstin)
-    ) {
+    if (party.placeOfSupply !== gstinStateCode(party.gstin)) {
       return 'The place of supply does not match the state in the GSTIN';
     }
   } else if (party.gstin) {
-    return 'Only registered, composition and SEZ parties have a GSTIN';
+    return 'Only registered and composition parties have a GSTIN';
   }
 
   if (party.transin) {
@@ -103,19 +84,7 @@ export function partyProblem(party: PartyFacts): string | null {
     if (!TRANSIN_PATTERN.test(party.transin)) return 'TRANSIN is 15 characters: the state code, then 13 letters or digits';
   }
 
-  if (party.treatment === 'OVERSEAS') {
-    if (!party.country) return 'Enter the country';
-    if (party.placeOfSupply)
-      return 'A party outside India has no place of supply';
-  } else {
-    if (!party.placeOfSupply) return 'Pick the place of supply';
-    if (!STATE_CODES.has(party.placeOfSupply))
-      return 'Unknown GST state code for the place of supply';
-    if (party.country) return 'Country is only for a party outside India';
-    if (party.foreignTaxId)
-      return 'A foreign tax ID is only for a party outside India';
-    if (party.currency !== 'INR')
-      return 'Only a party outside India can be billed in BTN';
-  }
+  if (!party.placeOfSupply) return 'Pick the place of supply';
+  if (!STATE_CODES.has(party.placeOfSupply)) return 'Unknown GST state code for the place of supply';
   return null;
 }

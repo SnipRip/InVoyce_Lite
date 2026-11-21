@@ -6,8 +6,8 @@ import {
 } from './company-profile.service.js';
 import { UpdateCompanyProfileDto } from './dto/update-company-profile.dto.js';
 
-// Edited on the GST & export setup screen (frontend config/navigation.ts).
-const MODULE = '/masters/tax-export';
+// Edited on the Company & GST setup screen (frontend config/navigation.ts).
+const MODULE = '/masters/company';
 
 // Reading is open to every signed-in user: every document needs our state
 // for its GST, and prints our name and address.

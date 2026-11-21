@@ -16,9 +16,7 @@ export const BENEFIT_OPTIONS: { value: SchemeBenefit; label: string; levels: Sch
 ];
 
 export const PARTY_SCOPE_OPTIONS: { value: SchemePartyScope; label: string }[] = [
-  { value: "ALL", label: "Every customer" },
-  { value: "INDIA", label: "Customers in India (and walk-ins)" },
-  { value: "OVERSEAS", label: "Bhutan and other overseas buyers" },
+  { value: "ALL", label: "Every customer (and walk-ins)" },
   { value: "SELECTED", label: "Selected customers" },
 ];
 

@@ -14,8 +14,7 @@ import type { RegisterEntryView, RegisterKindView } from "@/types/document-regis
 import { ownerHref, REGISTER_KINDS, registerKindName } from "./documents-api";
 
 // Every document number in one searchable list: IRNs, challans, e-way bills,
-// customs papers, BRCs, vendor bills. Search finds one by number, vehicle,
-// invoice, bill, shipment or party (SOW 12 and 17).
+// vendor bills. Search finds one by number, vehicle, invoice, bill or party.
 export function RegisterTableCard({ entries }: { entries: RegisterEntryView[] }) {
   const [kind, setKind] = useState<RegisterKindView | "all">("all");
   const [query, setQuery] = useState("");
@@ -24,7 +23,7 @@ export function RegisterTableCard({ entries }: { entries: RegisterEntryView[] })
     (entry) =>
       (kind === "all" || entry.kind === kind) &&
       (!needle ||
-        `${registerKindName(entry.kind)} ${entry.number} ${entry.owner.number} ${entry.partyName} ${entry.vehicle ?? ""} ${entry.shipment?.number ?? ""}`
+        `${registerKindName(entry.kind)} ${entry.number} ${entry.owner.number} ${entry.partyName} ${entry.vehicle ?? ""}`
           .toLowerCase()
           .includes(needle)),
   );
@@ -40,7 +39,7 @@ export function RegisterTableCard({ entries }: { entries: RegisterEntryView[] })
           label="Search documents"
           value={query}
           onChange={setQuery}
-          placeholder="Number, vehicle, invoice, shipment or party"
+          placeholder="Number, vehicle, invoice or party"
           trailing={`${visible.length} of ${entries.length}`}
         />
         <FilterGroup label="Document kind">
@@ -84,14 +83,6 @@ export function RegisterTableCard({ entries }: { entries: RegisterEntryView[] })
                 </div>
                 <div className="text-xs text-muted">
                   {entry.partyName}
-                  {entry.shipment && (
-                    <>
-                      {" · "}
-                      <Link href={`/shipments/${entry.shipment.id}`} className="hover:underline">
-                        {entry.shipment.number}
-                      </Link>
-                    </>
-                  )}
                 </div>
               </td>
               <td>{entry.vehicle ?? "–"}</td>

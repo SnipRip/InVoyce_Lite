@@ -136,8 +136,6 @@ export interface SettlementBody {
   amount: number;
   tds: number;
   reference: string | null;
-  brcNumber: string | null;
-  brcDate: string | null;
   notes: string | null;
   allocations: AllocationBody[];
 }

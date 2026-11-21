@@ -139,8 +139,6 @@ export function RefundForm({ settlements, noteCredits, accounts, initialAdvanceI
           amount: Math.round(chosen.reduce((sum, row) => sum + row.amount, 0) * 100) / 100,
           tds: 0,
           reference: values.reference || null,
-          brcNumber: null,
-          brcDate: null,
           notes: values.notes || null,
           allocations: chosen,
         });

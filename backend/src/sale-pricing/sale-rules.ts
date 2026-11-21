@@ -2,17 +2,16 @@
 // The frontend shows the same live from features/gst/gst-rules.ts saleTax.
 import { chargesGst, outsideStateProblem, type OurRegistration } from '../common/gst/our-registration.js';
 import type { TaxSplit } from '../common/gst/tax-split.js';
-import type { ExportRoute, GstTreatment, InvoiceKind, LineRateSource, SaleRegime } from '../generated/prisma/enums.js';
+import type { GstTreatment, LineRateSource, SaleRegime } from '../generated/prisma/enums.js';
 
 /**
- * Overseas and SEZ buyers: export under LUT (0%) or with IGST paid; else
  * CGST + SGST when the place of supply is our state, IGST from another.
  * A composition dealer or unregistered business charges no GST (bill of
  * supply) and may not sell outside its state: `problem` says why.
  */
 export function saleRegime(
   company: OurRegistration,
-  party: { treatment: GstTreatment; placeOfSupply: string | null; exportRoute: ExportRoute | null },
+  party: { treatment: GstTreatment; placeOfSupply: string | null },
 ): { regime: SaleRegime; split: TaxSplit; problem: string | null } {
   const regular = regularSale(company.stateCode, party);
   if (chargesGst(company)) return { ...regular, problem: null };
@@ -21,11 +20,8 @@ export function saleRegime(
 
 function regularSale(
   companyState: string,
-  party: { treatment: GstTreatment; placeOfSupply: string | null; exportRoute: ExportRoute | null },
+  party: { placeOfSupply: string | null },
 ): { regime: SaleRegime; split: TaxSplit } {
-  if (party.treatment === 'OVERSEAS' || party.treatment === 'SEZ') {
-    return party.exportRoute === 'IGST' ? { regime: 'EXPORT_IGST', split: 'INTER' } : { regime: 'EXPORT_LUT', split: 'NONE' };
-  }
   // A walk-in buyer or one with no state on record buys here.
   return !party.placeOfSupply || party.placeOfSupply === companyState
     ? { regime: 'INTRA_STATE', split: 'INTRA' }
@@ -40,24 +36,16 @@ export interface OfferedRates {
 }
 
 /**
- * An invoice charges GST by its own kind and fields: an export invoice by
- * its route (LUT or IGST paid, defaulting to the buyer's); a local one by its
- * place of supply, which can differ from the buyer's state (delivery to
- * another state). SEZ buyers are zero-rated like exports either way.
+ * An invoice charges GST by its place of supply, which can differ from the
+ * buyer's state (delivery to another state).
  */
 export function invoiceRegime(
   company: OurRegistration,
-  kind: InvoiceKind,
-  party: { treatment: GstTreatment; placeOfSupply: string | null; exportRoute: ExportRoute | null },
-  fields: { placeOfSupply?: string | null; exportRoute?: ExportRoute | null },
-): { regime: SaleRegime; split: TaxSplit; placeOfSupply: string | null; problem: string | null } {
-  const route = fields.exportRoute ?? party.exportRoute;
-  if (kind === 'EXPORT' || party.treatment === 'SEZ') {
-    const exported = saleRegime(company, { treatment: 'OVERSEAS', placeOfSupply: null, exportRoute: route });
-    return { ...exported, placeOfSupply: kind === 'LOCAL' ? (fields.placeOfSupply ?? party.placeOfSupply ?? company.stateCode) : null };
-  }
+  party: { treatment: GstTreatment; placeOfSupply: string | null },
+  fields: { placeOfSupply?: string | null },
+): { regime: SaleRegime; split: TaxSplit; placeOfSupply: string; problem: string | null } {
   const placeOfSupply = fields.placeOfSupply ?? party.placeOfSupply ?? company.stateCode;
-  return { ...saleRegime(company, { treatment: party.treatment, placeOfSupply, exportRoute: null }), placeOfSupply };
+  return { ...saleRegime(company, { treatment: party.treatment, placeOfSupply }), placeOfSupply };
 }
 
 /**

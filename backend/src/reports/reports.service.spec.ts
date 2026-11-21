@@ -2,7 +2,6 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 import type { AuthContext } from '../common/types/authenticated-request.js';
 import type { PrismaService } from '../database/prisma.service.js';
-import type { ProfitService } from '../profit/profit.service.js';
 import type { SettlementsService } from '../settlements/settlements.service.js';
 import { ReportsService } from './reports.service.js';
 
@@ -12,7 +11,6 @@ const staff = (permissions: AuthContext['permissions']): AuthContext => ({ userI
 const service = () =>
   new ReportsService(
     { invoice: { findMany: () => Promise.resolve([]) } } as unknown as PrismaService,
-    {} as ProfitService,
     {} as SettlementsService,
   );
 

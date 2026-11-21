@@ -21,11 +21,10 @@ interface ChallanDetailProps {
   challan: ChallanView;
   party: Party | undefined;
   issuer: Issuer;
-  overseas: boolean;
   onChanged: () => Promise<void>;
 }
 
-export function ChallanDetail({ challan, party, issuer, overseas, onChanged }: ChallanDetailProps) {
+export function ChallanDetail({ challan, party, issuer, onChanged }: ChallanDetailProps) {
   return (
     <div className="grid items-start gap-3.5 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="flex min-w-0 flex-col gap-3.5">
@@ -98,7 +97,7 @@ export function ChallanDetail({ challan, party, issuer, overseas, onChanged }: C
       <GlassCard className="flex flex-col gap-3 xl:sticky xl:top-3.5">
         {challan.status === "OPEN" && (
           <>
-            <Link href={invoiceFromChallanHref(challan, overseas)} className={buttonClasses("success", undefined, "lg")}>
+            <Link href={invoiceFromChallanHref(challan)} className={buttonClasses("success", undefined, "lg")}>
               Make the invoice
             </Link>
             <p className="text-xs font-medium text-muted">The invoice is filled with these goods; it draws the stock and posts the sale. The challan is then marked invoiced.</p>

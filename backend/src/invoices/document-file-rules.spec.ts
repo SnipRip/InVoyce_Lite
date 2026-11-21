@@ -24,7 +24,7 @@ describe('documentFileProblem', () => {
 
 describe('cleanFileName', () => {
   it('keeps a plain name and drops paths and odd characters', () => {
-    expect(cleanFileName('Shipping bill 4521.pdf', 'application/pdf')).toBe('Shipping bill 4521.pdf');
+    expect(cleanFileName('E-way bill 4521.pdf', 'application/pdf')).toBe('E-way bill 4521.pdf');
     expect(cleanFileName('C:\\scans\\brc<1>.jpg', 'image/jpeg')).toBe('brc1.jpg');
     expect(cleanFileName(undefined, 'image/png')).toBe('document.png');
   });

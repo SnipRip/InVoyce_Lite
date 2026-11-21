@@ -27,14 +27,12 @@ interface CardProps {
 }
 
 const STATE_OPTIONS = INDIAN_STATES.map((state) => ({ value: state.code, label: `${state.name} (${state.code})` }));
-const BRANCH_TREATMENTS = GST_TREATMENTS.filter((option) => option.value !== "overseas");
 
 export const LICENCE_KINDS: { value: LicenceKind; label: string; hint: string }[] = [
   { value: "FSSAI", label: "FSSAI (food)", hint: "14 digits" },
   { value: "DRUG", label: "Drug licence", hint: "Form 20 / 21" },
   { value: "TRADE", label: "Trade licence", hint: "Municipal" },
   { value: "SHOP_ESTABLISHMENT", label: "Shop & establishment", hint: "" },
-  { value: "IEC", label: "Import export code", hint: "10 characters" },
   { value: "OTHER", label: "Other", hint: "" },
 ];
 
@@ -60,7 +58,7 @@ export function BranchesCard({ control, register, setValue, errors }: CardProps)
   const onGstinChange = (index: number, value: string) => {
     const upper = value.toUpperCase();
     setValue(`branches.${index}.gstin`, upper, { shouldDirty: true });
-    if (checkGstin(upper).valid && branches[index]?.treatment !== "sez") {
+    if (checkGstin(upper).valid) {
       setValue(`branches.${index}.stateCode`, gstinStateCode(upper), { shouldDirty: true, shouldValidate: true });
     }
   };
@@ -89,7 +87,7 @@ export function BranchesCard({ control, register, setValue, errors }: CardProps)
         const own = branch.kind === "branch";
         const rowErrors = errors.branches?.[index];
         const gstinCheck = branch.gstin ? checkGstin(branch.gstin) : undefined;
-        const lockedState = own && needsGstin(branch.treatment) && branch.treatment !== "sez" && Boolean(gstinCheck?.valid);
+        const lockedState = own && needsGstin(branch.treatment) && Boolean(gstinCheck?.valid);
         return (
           <div key={field.fieldKey} className={`flex flex-col gap-3 rounded-2xl border border-line p-3.5 ${branch.archived ? "opacity-60" : ""}`}>
             <div className="flex flex-wrap items-center gap-2">
@@ -117,7 +115,7 @@ export function BranchesCard({ control, register, setValue, errors }: CardProps)
                   render={({ field: treatment }) => (
                     <SelectField
                       label="GST treatment"
-                      options={BRANCH_TREATMENTS.map((option) => ({ value: option.value, label: option.label }))}
+                      options={GST_TREATMENTS.map((option) => ({ value: option.value, label: option.label }))}
                       value={treatment.value}
                       onValueChange={treatment.onChange}
                     />

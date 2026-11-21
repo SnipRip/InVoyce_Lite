@@ -14,7 +14,6 @@ export const companyProfileSchema = z
     stateCode: z.string().regex(/^\d{2}$/, "Pick our GST state"),
     gstin: z.string().trim().toUpperCase(),
     pan: optional(/^[A-Z]{5}\d{4}[A-Z]$/, "PAN is 5 letters, 4 digits, 1 letter"),
-    iec: optional(/^[A-Z0-9]{10}$/, "The IEC has 10 letters and digits"),
     addressLine: z.string().trim().max(160),
     city: z.string().trim().max(60),
     district: z.string().trim().max(60),
@@ -22,11 +21,6 @@ export const companyProfileSchema = z
     phone,
     altPhone: phone,
     email: z.union([z.literal(""), z.email("Enter a valid email")]),
-    exportBank: z.string().trim().max(80),
-    customsStation: z.string().trim().max(80),
-    portCode: optional(/^[A-Z0-9]{6}$/, "Port codes have 6 letters and digits, as printed on the shipping bill"),
-    defaultExportRoute: z.enum(["LUT", "IGST"]),
-    exportCurrency: z.enum(["INR", "BTN"]),
     enforceHsnGstRate: z.boolean(),
   })
   .superRefine((values, context) => {

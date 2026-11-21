@@ -5,7 +5,7 @@ import type { NumberedKind, NumberingMethod, NumberReset } from "@/types/number-
 
 interface KindInfo {
   label: string;
-  group: "Sales" | "Purchases and payments" | "Stock and export" | "Master codes";
+  group: "Sales" | "Purchases and payments" | "Stock" | "Master codes";
   /** Follows GST rule 46 and the e-invoice portal: 16 characters, unique in the year. */
   gst: boolean;
   suggested: { pattern: string; reset: NumberReset };
@@ -16,8 +16,7 @@ const never = (pattern: string) => ({ pattern, reset: "NEVER" as const });
 
 export const KINDS: Record<NumberedKind, KindInfo> = {
   QUOTATION: { label: "Quotation", group: "Sales", gst: false, suggested: yearly("QT/{FY}/{SEQ:4}") },
-  SALES_INVOICE: { label: "Local tax invoice", group: "Sales", gst: true, suggested: yearly("INV/{FY}/{SEQ:4}") },
-  EXPORT_INVOICE: { label: "Export invoice", group: "Sales", gst: true, suggested: yearly("EXP/{FY}/{SEQ:4}") },
+  SALES_INVOICE: { label: "Tax invoice", group: "Sales", gst: true, suggested: yearly("INV/{FY}/{SEQ:4}") },
   RECEIPT: { label: "Receipt (customers, loans)", group: "Sales", gst: true, suggested: yearly("RCT/{FY}/{SEQ:4}") },
   CREDIT_NOTE: { label: "Credit note", group: "Sales", gst: true, suggested: yearly("CN/{FY}/{SEQ:4}") },
   PURCHASE_ORDER: { label: "Purchase order", group: "Purchases and payments", gst: false, suggested: yearly("PO/{FY}/{SEQ:4}") },
@@ -26,10 +25,9 @@ export const KINDS: Record<NumberedKind, KindInfo> = {
   DEBIT_NOTE: { label: "Debit note", group: "Purchases and payments", gst: true, suggested: yearly("DN/{FY}/{SEQ:4}") },
   JOURNAL: { label: "Journal entry", group: "Purchases and payments", gst: false, suggested: yearly("JV/{FY}/{SEQ:4}") },
   EXPENSE: { label: "Expense", group: "Purchases and payments", gst: false, suggested: yearly("EXPN/{FY}/{SEQ:4}") },
-  STOCK_JOURNAL: { label: "Stock adjustment", group: "Stock and export", gst: false, suggested: yearly("SJ/{FY}/{SEQ:4}") },
-  STOCK_TRANSFER: { label: "Stock transfer", group: "Stock and export", gst: false, suggested: yearly("ST/{FY}/{SEQ:4}") },
-  DELIVERY_CHALLAN: { label: "Delivery challan", group: "Stock and export", gst: true, suggested: yearly("DC/{FY}/{SEQ:4}") },
-  SHIPMENT: { label: "Shipment", group: "Stock and export", gst: false, suggested: yearly("SHP/{FY}/{SEQ:4}") },
+  STOCK_JOURNAL: { label: "Stock adjustment", group: "Stock", gst: false, suggested: yearly("SJ/{FY}/{SEQ:4}") },
+  STOCK_TRANSFER: { label: "Stock transfer", group: "Stock", gst: false, suggested: yearly("ST/{FY}/{SEQ:4}") },
+  DELIVERY_CHALLAN: { label: "Delivery challan", group: "Stock", gst: true, suggested: yearly("DC/{FY}/{SEQ:4}") },
   CUSTOMER_CODE: { label: "Customer code", group: "Master codes", gst: false, suggested: never("C{SEQ:5}") },
   VENDOR_CODE: { label: "Vendor code", group: "Master codes", gst: false, suggested: never("V{SEQ:5}") },
   ITEM_SKU: { label: "Item SKU", group: "Master codes", gst: false, suggested: never("SKU-{SEQ:5}") },

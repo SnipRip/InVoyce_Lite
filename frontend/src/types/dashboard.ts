@@ -3,7 +3,6 @@
 import type { DispatchDocumentKindView } from "./invoice";
 import type { QuotationStatusView } from "./quotation";
 import type { SettlementDirectionView, SettlementTargetView } from "./settlement";
-import type { ShipmentStageView } from "./shipment";
 
 export interface DashboardDueView {
   direction: SettlementDirectionView;
@@ -23,7 +22,7 @@ export interface DashboardView {
   to: string;
   /** Mondays of the chart's weeks, oldest first; each `byWeek` has one figure per week. */
   weeks: string[];
-  sales: { total: number; invoices: number; exportInvoices: number; byWeek: number[] } | null;
+  sales: { total: number; invoices: number; byWeek: number[] } | null;
   purchases: { total: number; bills: number; vendors: number; byWeek: number[]; untaggedCharges: number } | null;
   profit: {
     sales: number;
@@ -40,19 +39,7 @@ export interface DashboardView {
     byWeek: number[];
   } | null;
   outstanding: { receivable: number; openInvoices: number; payable: number; dues: DashboardDueView[] } | null;
-  documents: { missing: number; holdingTrucks: number; first: { kind: DispatchDocumentKindView; invoiceNumber: string }[] } | null;
+  documents: { missing: number; first: { kind: DispatchDocumentKindView; invoiceNumber: string }[] } | null;
   stock: { low: number; first: string[] } | null;
   quotations: { id: string; number: string; revision: number; partyName: string; total: number; validUntil: string; status: QuotationStatusView }[] | null;
-  shipments: {
-    counts: { planned: number; onTheRoad: number; done: number };
-    latest: {
-      id: string;
-      number: string;
-      vehicleNumber: string;
-      stage: ShipmentStageView;
-      partyName: string;
-      nextStage: ShipmentStageView | null;
-      waitingFor: DispatchDocumentKindView[];
-    }[];
-  } | null;
 }

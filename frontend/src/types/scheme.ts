@@ -2,7 +2,7 @@
 
 export type SchemeLevel = "LINE" | "ORDER";
 export type SchemeBenefit = "PERCENT" | "AMOUNT_PER_UNIT" | "FLAT_AMOUNT" | "FREE_QUANTITY";
-export type SchemePartyScope = "ALL" | "INDIA" | "OVERSEAS" | "SELECTED";
+export type SchemePartyScope = "ALL" | "SELECTED";
 export type SchemeRateSource = "SHEET" | "SPECIAL" | "MANUAL";
 
 /** Exactly one of the three. */

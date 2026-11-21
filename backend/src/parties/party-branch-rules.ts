@@ -16,8 +16,8 @@ import type {
 } from '../generated/prisma/enums.js';
 import { needsGstin } from './party-rules.js';
 
-/** Treatments a branch may have: branches are in India. */
-export const BRANCH_TREATMENTS: GstTreatment[] = ['REGISTERED', 'COMPOSITION', 'UNREGISTERED', 'CONSUMER', 'SEZ'];
+/** Treatments a branch may have. */
+export const BRANCH_TREATMENTS: GstTreatment[] = ['REGISTERED', 'COMPOSITION', 'UNREGISTERED', 'CONSUMER'];
 
 export interface BranchFacts {
   kind: PartyBranchKind;
@@ -46,9 +46,9 @@ export function settleBranch<T extends BranchFacts>(branch: T, owner: BranchOwne
     settled.gstin = null;
     return settled;
   }
-  settled.treatment ??= owner.treatment === 'OVERSEAS' ? 'REGISTERED' : owner.treatment;
+  settled.treatment ??= owner.treatment;
   if (!needsGstin(settled.treatment)) settled.gstin = null;
-  if (settled.gstin && !gstinProblem(settled.gstin) && settled.treatment !== 'SEZ') {
+  if (settled.gstin && !gstinProblem(settled.gstin)) {
     settled.placeOfSupply = gstinStateCode(settled.gstin);
   }
   return settled;
@@ -64,7 +64,7 @@ export function branchProblem(branch: BranchFacts, owner: BranchOwner): string |
   if (branch.kind === 'SHIP_TO') return null;
 
   const treatment = branch.treatment!;
-  if (!BRANCH_TREATMENTS.includes(treatment)) return say('a branch is in India; pick its GST treatment');
+  if (!BRANCH_TREATMENTS.includes(treatment)) return say('pick its GST treatment');
   if (needsGstin(treatment)) {
     if (!branch.gstin) return say('enter the GSTIN');
     const problem = gstinProblem(branch.gstin);
@@ -75,7 +75,7 @@ export function branchProblem(branch: BranchFacts, owner: BranchOwner): string |
       return say(`the GSTIN is under PAN ${gstinPan(branch.gstin)}, not this party's ${pan}; a different PAN is a different business, so add it as its own party`);
     }
   } else if (branch.gstin) {
-    return say('only registered, composition and SEZ branches have a GSTIN');
+    return say('only registered and composition branches have a GSTIN');
   }
   return null;
 }
@@ -123,7 +123,6 @@ export const FSSAI_PATTERN = /^\d{14}$/;
 export function licenceProblem(licence: { kind: PartyLicenceKind; label: string | null; number: string }): string | null {
   if (!licence.number.trim()) return 'Enter the licence number';
   if (licence.kind === 'FSSAI' && !FSSAI_PATTERN.test(licence.number)) return 'FSSAI licence number is 14 digits';
-  if (licence.kind === 'IEC' && !/^[A-Z0-9]{10}$/.test(licence.number)) return 'IEC is 10 characters';
   if (licence.kind === 'OTHER' && !licence.label?.trim()) return 'Say what the other licence is';
   return null;
 }

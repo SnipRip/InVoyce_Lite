@@ -29,7 +29,6 @@ import { JournalsModule } from './journals/journals.module.js';
 import { NotesModule } from './notes/notes.module.js';
 import { ChallansModule } from './challans/challans.module.js';
 import { LoansModule } from './loans/loans.module.js';
-import { LutsModule } from './luts/luts.module.js';
 import { NumberSeriesModule } from './number-series/number-series.module.js';
 import { PartiesModule } from './parties/parties.module.js';
 import { PriceListModule } from './price-list/price-list.module.js';
@@ -39,7 +38,6 @@ import { PurchasesModule } from './purchases/purchases.module.js';
 import { QuotationsModule } from './quotations/quotations.module.js';
 import { InvoicesModule } from './invoices/invoices.module.js';
 import { ExpensesModule } from './expenses/expenses.module.js';
-import { ShipmentsModule } from './shipments/shipments.module.js';
 import { VehiclesModule } from './vehicles/vehicles.module.js';
 import { TransportersModule } from './transporters/transporters.module.js';
 import { SearchModule } from './search/search.module.js';
@@ -78,7 +76,6 @@ import { WhatsappOptInsModule } from './whatsapp-optins/whatsapp-optins.module.j
     InvoicesModule,
     SettlementsModule,
     ExpensesModule,
-    ShipmentsModule,
     VehiclesModule,
     TransportersModule,
     SearchModule,
@@ -89,7 +86,6 @@ import { WhatsappOptInsModule } from './whatsapp-optins/whatsapp-optins.module.j
     StockMovesModule,
     CompanyProfileModule,
     SalesSettingsModule,
-    LutsModule,
     NumberSeriesModule,
     BankCashAccountsModule,
     AccountHeadsModule,

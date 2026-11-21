@@ -1,18 +1,14 @@
 import { Transform, Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEnum, IsObject, IsOptional, IsString, IsUUID, Length, Matches, MaxLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsObject, IsOptional, IsString, IsUUID, Length, Matches, MaxLength, ValidateNested } from 'class-validator';
 import { IsIsoDate } from '../../common/dto/field-validators.js';
 import { codeOrNull, trim, trimToNull } from '../../common/dto/text-transforms.js';
-import { ExportRoute, InvoiceKind, PartyCurrency } from '../../generated/prisma/enums.js';
 import { MAX_LINE_ITEMS } from '../../pricing/dto/line-rate-options.dto.js';
 import { QuotationLineDto } from '../../quotations/dto/quotation.dto.js';
 
 // Field formats only; invoices.service.ts checks the customer against the
-// kind, the godown, the LUT and the stock, takes GST and costs from the
+// godown and the stock, takes GST and costs from the
 // masters and applies the schemes. Lines are the same shape as a quotation's.
 export class InvoiceDto {
-  @IsEnum(InvoiceKind)
-  kind: InvoiceKind;
-
   @IsUUID()
   partyId: string;
 
@@ -40,22 +36,13 @@ export class InvoiceDto {
   @MaxLength(16)
   number?: string | null;
 
-  /** Local invoices: defaults to the customer's state. */
+  /** Defaults to the customer's state. */
   @Transform(trimToNull)
   @IsOptional()
   @Matches(/^\d{2}$/, { message: 'Place of supply is a two-digit GST state code' })
   placeOfSupply?: string | null;
 
-  /** Export invoices: defaults to the buyer's route. */
-  @IsOptional()
-  @IsEnum(ExportRoute)
-  exportRoute?: ExportRoute | null;
-
-  @IsOptional()
-  @IsEnum(PartyCurrency)
-  currency?: PartyCurrency;
-
-  /** False: a local invoice issued without GST. Exports go under LUT for that instead. */
+  /** False: issued without GST, as a bill of supply. */
   @IsOptional()
   @IsBoolean()
   gstApplicable?: boolean;

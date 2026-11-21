@@ -31,8 +31,6 @@ export const settlementSchema = z
     accountId: z.string().min(1, "Pick the account"),
     reference: z.string().trim().max(60),
     tds: optionalAmount,
-    brcNumber: z.string().trim().max(40),
-    brcDate: z.string(),
     notes: z.string().max(300),
     allocations: z.array(allocationRow),
   })
@@ -40,8 +38,6 @@ export const settlementSchema = z
     const free = (Number(values.amount) || 0) + (Number(values.tds) || 0);
     if (free <= 0) ctx.addIssue({ code: "custom", path: ["amount"], message: "Must be more than 0" });
     checkRows(values.allocations, free, ctx, "amount");
-    if (values.brcNumber && !values.brcDate) ctx.addIssue({ code: "custom", path: ["brcDate"], message: "Pick the BRC date" });
-    if (!values.brcNumber && values.brcDate) ctx.addIssue({ code: "custom", path: ["brcNumber"], message: "Enter the BRC number" });
   });
 
 export type SettlementFormValues = z.infer<typeof settlementSchema>;

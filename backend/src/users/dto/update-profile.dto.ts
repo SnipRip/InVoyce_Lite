@@ -21,7 +21,7 @@ export class UpdateProfileDto {
   )
   @IsOptional()
   @Matches(/^\+[1-9]\d{7,14}$/, {
-    message: 'Phone must include the country code, for example +919635312988',
+    message: 'Phone must include the country code, for example +919876543210',
   })
   phone: string | null;
 }

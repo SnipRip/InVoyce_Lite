@@ -5,7 +5,6 @@ import {
   ageBucket,
   allocationProblem,
   balanceOf,
-  brcProblem,
   cashLimitProblem,
   dateProblem,
   invoiceDueDate,
@@ -88,16 +87,6 @@ describe('allocationProblem', () => {
   });
 });
 
-describe('brcProblem', () => {
-  it('takes a BRC on export receipts, dated between the receipt and today', () => {
-    expect(brcProblem(null, '2026-11-01', '2026-11-06', false)).toBeNull();
-    expect(brcProblem({ number: 'B1', date: '2026-11-02' }, '2026-11-01', '2026-11-06', true)).toBeNull();
-    expect(brcProblem({ number: 'B1', date: '2026-11-02' }, '2026-11-01', '2026-11-06', false)).toMatch(/export invoice/);
-    expect(brcProblem({ number: 'B1', date: '2026-10-31' }, '2026-11-01', '2026-11-06', true)).toMatch(/before the receipt/);
-    expect(brcProblem({ number: 'B1', date: '2026-11-07' }, '2026-11-01', '2026-11-06', true)).toMatch(/after today/);
-  });
-});
-
 describe('due dates and ageing', () => {
   it('works out due dates and caps MSME bills at 45 days', () => {
     expect(invoiceDueDate('2026-11-06', 30)).toBe('2026-12-06');
@@ -136,14 +125,13 @@ describe('refunds of advances', () => {
     expect(refundPartyProblem('PAYMENT', null)).toMatch(/Pick/);
   });
 
-  it('returns advances and note credits only, all of the amount, with no TDS or BRC', () => {
-    const fine = { kinds: ['ADVANCE' as const, 'ADVANCE' as const], amount: 15_000, tds: 0, applied: 15_000, hasBrc: false };
+  it('returns advances and note credits only, all of the amount, with no TDS', () => {
+    const fine = { kinds: ['ADVANCE' as const, 'ADVANCE' as const], amount: 15_000, tds: 0, applied: 15_000 };
     expect(refundShapeProblem(fine)).toBeNull();
     expect(refundShapeProblem({ ...fine, kinds: [] })).toMatch(/Pick/);
     expect(refundShapeProblem({ ...fine, kinds: ['ADVANCE', 'INVOICE'] })).toMatch(/advances and note credits only/);
     expect(refundShapeProblem({ ...fine, kinds: ['ADVANCE', 'CREDIT_NOTE'] })).toBeNull();
     expect(refundShapeProblem({ ...fine, tds: 100 })).toMatch(/TDS/);
-    expect(refundShapeProblem({ ...fine, hasBrc: true })).toMatch(/BRC/);
     expect(refundShapeProblem({ ...fine, applied: 14_000 })).toMatch(/total/);
   });
 

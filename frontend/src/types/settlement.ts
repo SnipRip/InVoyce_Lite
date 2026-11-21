@@ -42,7 +42,6 @@ export interface SettlementView {
   amount: number;
   tds: number;
   reference: string | null;
-  brc: { number: string; date: string } | null;
   notes: string | null;
   allocations: SettlementAllocationView[];
   applied: number;
@@ -73,7 +72,7 @@ export interface OpenDocumentView {
   settled: number;
   balance: number;
   ageBucket: AgeBucketView;
-  flag: "EXPORT" | "MSME" | null;
+  flag: "MSME" | null;
   /** JOURNAL rows: the journal the charging line is on. */
   journalId?: string;
 }

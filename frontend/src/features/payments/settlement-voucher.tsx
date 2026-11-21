@@ -128,11 +128,6 @@ export function SettlementVoucher({ settlement, issuer }: { settlement: Settleme
         <span className="font-semibold">Amount in words: </span>
         {amountInWords(settlement.amount)}
       </p>
-      {settlement.brc && (
-        <p className="mt-1">
-          BRC / e-BRC {settlement.brc.number} dated {formatDate(settlement.brc.date)}
-        </p>
-      )}
 
       <footer className="mt-10 flex items-end justify-between gap-3.5 text-[11px]">
         <p>{receipt ? "Received with thanks." : "Received the above payment."}</p>

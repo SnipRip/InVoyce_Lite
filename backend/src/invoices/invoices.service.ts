@@ -10,11 +10,10 @@ import { SalePricingService } from '../sale-pricing/sale-pricing.service.js';
 import { invoiceRegime } from '../sale-pricing/sale-rules.js';
 import { liveSettlementNumbers } from '../settlements/settlements.service.js';
 import { costOfDraws } from '../stock/fifo-rules.js';
-import { shipmentCarrying } from '../shipments/shipment-locks.js';
 import { drawStock, returnStock } from '../stock/stock-out.js';
 import { pickedVehicleNumber } from '../vehicles/picked-vehicle.js';
 import type { InvoiceDto } from './dto/invoice.dto.js';
-import { conversionProblem, kindProblem, quantityOut, SERIES_OF } from './invoice-rules.js';
+import { conversionProblem, quantityOut } from './invoice-rules.js';
 import { invoiceInclude, toInvoiceView, type InvoiceView } from './invoice-views.js';
 import { freeToSend, invoiceFromChallanProblem } from '../challans/challan-rules.js';
 import { challanStock } from '../challans/challan-stock.js';
@@ -26,11 +25,10 @@ const fail = (message: string | null) => {
   if (message) throw new BadRequestException(message);
 };
 
-// Sales invoices: a local GST tax invoice or an export invoice. On save, in
-// one transaction: every line is priced on the server exactly as a quotation
-// is (SalePricingService), GST follows the invoice's place of supply or
-// export route, an export under LUT copies the LUT ARN in force on its date,
-// the number comes from the kind's series, and the goods are drawn out of the
+// Sales invoices: a GST tax invoice (or a bill of supply). On save, in one
+// transaction: every line is priced on the server exactly as a quotation is
+// (SalePricingService), GST follows the invoice's place of supply, the
+// number comes from the sales invoice series, and the goods are drawn out of the
 // godown's stock oldest first (src/stock), so each line keeps the real cost
 // of what it sent. Invoices are not edited: cancel (stock goes back, number
 // cancelled) and issue a new one.
@@ -60,7 +58,7 @@ export class InvoicesService {
       async (tx) => {
         const party = await tx.party.findUnique({
           where: { id: dto.partyId },
-          select: { isCustomer: true, isArchived: true, treatment: true, placeOfSupply: true, exportRoute: true, country: true, currency: true },
+          select: { isCustomer: true, isArchived: true, treatment: true, placeOfSupply: true },
         });
         if (!party?.isCustomer) fail('Pick a customer');
         if (party!.isArchived) fail('This customer is archived');
@@ -68,7 +66,6 @@ export class InvoicesService {
         const billTo = await partyBranch(tx, dto.partyId, dto.billToBranchId, 'billing');
         const shipTo = await partyBranch(tx, dto.partyId, dto.shipToBranchId, 'delivery');
         const billed = billedAs(party!, billTo);
-        fail(kindProblem(dto.kind, billed.treatment));
         await liveGodown(tx, dto.godownId);
         if (dto.quotationId) await this.claimQuotation(tx, dto.quotationId, dto.partyId);
         // Raised from a delivery challan: open, same customer and godown; marked invoiced below.
@@ -80,14 +77,12 @@ export class InvoicesService {
         }
 
         const company = await ourRegistration(tx);
-        const sale = invoiceRegime(company, dto.kind, billed, { placeOfSupply: billTo ? billTo.placeOfSupply : dto.placeOfSupply, exportRoute: dto.exportRoute });
+        const sale = invoiceRegime(company, billed, { placeOfSupply: billTo ? billTo.placeOfSupply : dto.placeOfSupply });
         fail(sale.problem);
         const gstApplicable = dto.gstApplicable !== false;
-        if (!gstApplicable && dto.kind === 'EXPORT') fail('An export without GST goes under LUT: pick the LUT route');
-        // A local invoice without GST is a bill of supply.
+        // An invoice without GST is a bill of supply.
         const regime = gstApplicable ? sale.regime : 'BILL_OF_SUPPLY';
         const { split, placeOfSupply } = sale;
-        const lutArn = regime === 'EXPORT_LUT' ? await this.lutOn(tx, dto.date) : null;
         const { lines, totals } = await this.pricing.price(tx, {
           partyId: dto.partyId,
           date: dto.date,
@@ -125,7 +120,7 @@ export class InvoicesService {
           drawsOf.set(index, draws);
         }
 
-        const claimed = await this.numbers.issue(tx, SERIES_OF[dto.kind], dto.date, { typed: dto.number ?? undefined });
+        const claimed = await this.numbers.issue(tx, 'SALES_INVOICE', dto.date, { typed: dto.number ?? undefined });
         let cost = 0;
         const lineRows = lines.map(({ row, item }, index) => {
           const draws = drawsOf.get(index)!;
@@ -135,7 +130,6 @@ export class InvoicesService {
         });
         const row = await tx.invoice.create({
           data: {
-            kind: dto.kind,
             number: claimed.number,
             issuedNumberId: claimed.id,
             date: dateOnly(dto.date),
@@ -144,9 +138,6 @@ export class InvoicesService {
             regime,
             gstApplicable,
             placeOfSupply,
-            lutArn,
-            destinationCountry: dto.kind === 'EXPORT' ? (party!.country ?? null) : null,
-            currency: dto.currency ?? party!.currency,
             billToBranchId: billTo?.id ?? null,
             shipToBranchId: shipTo?.id ?? null,
             shipToLine: dto.shipToLine ?? shipTo?.addressLine ?? null,
@@ -171,7 +162,7 @@ export class InvoicesService {
     );
   }
 
-  /** Cancels an issued invoice with no live receipts, expenses or shipment on it: its stock goes back, its number is cancelled, its quotation is open again. */
+  /** Cancels an issued invoice with no live receipts, or expenses on it: its stock goes back, its number is cancelled, its quotation is open again. */
   cancel(id: string, reason: string): Promise<InvoiceView> {
     return this.prisma.$transaction(async (tx) => {
       const [current] = await tx.$queryRaw<{ status: string; issuedNumberId: string; quotationId: string | null }[]>`
@@ -184,8 +175,6 @@ export class InvoicesService {
       if (notes.length) throw new ConflictException(`Credit notes are issued against this invoice (${notes.map((row) => row.number).join(', ')}). Cancel them first.`);
       const expenses = await tx.expense.findMany({ where: { invoiceId: id, cancelledAt: null }, select: { number: true } });
       if (expenses.length) throw new ConflictException(`Expenses are allocated to this invoice (${expenses.map((row) => row.number).join(', ')}). Cancel them first.`);
-      const shipment = await shipmentCarrying(tx, id);
-      if (shipment) throw new ConflictException(`This invoice is on shipment ${shipment}. Take it off the shipment or cancel the shipment first.`);
       await returnStock(tx, id);
       await this.numbers.cancel(tx, current.issuedNumberId);
       if (current.quotationId) {
@@ -211,13 +200,5 @@ export class InvoicesService {
     const problem = conversionProblem(quotation.status);
     if (problem) throw new ConflictException(problem);
     await tx.quotation.update({ where: { id: quotationId }, data: { status: 'CONVERTED' } });
-  }
-
-  /** The LUT ARN in force on the date, copied onto the invoice. */
-  private async lutOn(tx: Tx, date: string): Promise<string> {
-    const day = dateOnly(date);
-    const lut = await tx.lut.findFirst({ where: { validFrom: { lte: day }, validTo: { gte: day } }, select: { arn: true } });
-    if (!lut) throw new ConflictException('No LUT covers this date. Add it on GST & export setup, or export with IGST paid.');
-    return lut.arn;
   }
 }

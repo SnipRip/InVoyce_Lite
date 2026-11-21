@@ -1,6 +1,6 @@
 // A customer or vendor as the backend returns it (backend/src/parties).
 // Its own GST and address fields are its main branch; `branches` are the rest.
-export type GstTreatmentCode = "REGISTERED" | "COMPOSITION" | "UNREGISTERED" | "CONSUMER" | "OVERSEAS" | "SEZ";
+export type GstTreatmentCode = "REGISTERED" | "COMPOSITION" | "UNREGISTERED" | "CONSUMER";
 
 export interface PartyBranchView {
   id: string;
@@ -27,7 +27,7 @@ export interface PartyContactView {
   whatsapp: boolean;
 }
 
-export type LicenceKind = "FSSAI" | "DRUG" | "TRADE" | "SHOP_ESTABLISHMENT" | "IEC" | "OTHER";
+export type LicenceKind = "FSSAI" | "DRUG" | "TRADE" | "SHOP_ESTABLISHMENT" | "OTHER";
 
 export interface PartyLicenceView {
   id: string;
@@ -63,10 +63,6 @@ export interface PartyView {
   gstin: string | null;
   pan: string | null;
   placeOfSupply: string | null;
-  country: string | null;
-  foreignTaxId: string | null;
-  currency: "INR" | "BTN";
-  exportRoute: "LUT" | "IGST" | null;
   isGta: boolean;
   /** Vendors without a GSTIN: transporter ID on e-way bills. */
   transin: string | null;

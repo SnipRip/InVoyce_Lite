@@ -24,9 +24,6 @@ export function GstDecisionTable({ company }: { company: OurRegistration }) {
     { label: "Composition dealer", profile: { treatment: "composition", stateCode: company.stateCode } },
     { label: "Unregistered business", profile: { treatment: "unregistered", stateCode: company.stateCode } },
     { label: `Consumer, in ${own}`, profile: { treatment: "consumer", stateCode: company.stateCode }, side: "sale" },
-    { label: "Bhutan buyer, under LUT", profile: { treatment: "overseas", exportRoute: "lut" }, side: "sale" },
-    { label: "Bhutan buyer, IGST paid", profile: { treatment: "overseas", exportRoute: "igst" }, side: "sale" },
-    { label: "Overseas supplier (import)", profile: { treatment: "overseas" }, side: "purchase" },
     {
       label: "Transport agency (GTA) freight, 5%",
       profile: { treatment: "registered", stateCode: company.stateCode, isGta: true },

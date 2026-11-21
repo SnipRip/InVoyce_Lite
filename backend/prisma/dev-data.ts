@@ -1,7 +1,7 @@
 // Development and test data that stays in the local database: godowns,
 // brands, HSN codes, items (no opening stock: stock comes in through purchase
 // bills), vendors, customers, this week's price list, special rates and
-// schemes, a bank account and a cash book, number formats and a test LUT.
+// schemes, a bank account and a cash book, and number formats.
 // Not for production. Run after `npm run db:seed` with
 // `npm run db:dev-data`. Safe to re-run: records are matched by name / SKU /
 // code and left as they are, and the price list gets entries for the week
@@ -78,10 +78,6 @@ interface PartySeed {
   treatment: GstTreatment;
   state?: string;
   pan?: string;
-  country?: string;
-  foreignTaxId?: string;
-  exportRoute?: 'LUT' | 'IGST';
-  currency?: 'INR' | 'BTN';
   isGta?: boolean;
   city: string;
   creditDays: number;
@@ -103,8 +99,8 @@ const PARTIES: PartySeed[] = [
   { displayName: 'Alipurduar Constructions', isCustomer: true, treatment: 'REGISTERED', state: '19', pan: 'AAEFA3344B', city: 'Alipurduar', creditDays: 30, creditLimit: 1500000, contactPerson: 'S. Saha', phone: '+919434000707' },
   { displayName: 'Sharma Hardware Store', isCustomer: true, treatment: 'REGISTERED', state: '18', pan: 'ACRPS9988Q', city: 'Bongaigaon', creditDays: 15, creditLimit: 500000, phone: '+919435000808' },
   { displayName: 'Ravi Kumar (contractor)', isCustomer: true, treatment: 'UNREGISTERED', state: '19', city: 'Siliguri', creditDays: 0, phone: '+919933000909' },
-  { displayName: 'Druk Builders Pvt Ltd', isCustomer: true, treatment: 'OVERSEAS', country: 'Bhutan', foreignTaxId: 'TPN-DBL-10234', exportRoute: 'LUT', city: 'Phuentsholing', creditDays: 30, creditLimit: 3000000, contactPerson: 'Karma Wangdi', phone: '+97517100110' },
-  { displayName: 'Tashi Construction', isCustomer: true, treatment: 'OVERSEAS', country: 'Bhutan', foreignTaxId: 'TPN-TC-55871', exportRoute: 'LUT', city: 'Thimphu', creditDays: 15, contactPerson: 'Tashi Dorji', phone: '+97517200220' },
+  { displayName: 'Jalpaiguri Builders Pvt Ltd', isCustomer: true, treatment: 'REGISTERED', state: '19', pan: 'AABCJ2468K', city: 'Jalpaiguri', creditDays: 30, creditLimit: 3000000, contactPerson: 'P. Ghosh', phone: '+919434100110' },
+  { displayName: 'Cooch Behar Construction', isCustomer: true, treatment: 'UNREGISTERED', state: '19', city: 'Cooch Behar', creditDays: 15, contactPerson: 'A. Barman', phone: '+919434200220' },
 ];
 
 async function main() {
@@ -162,10 +158,6 @@ async function main() {
         gstin: party.state && party.pan ? gstin(party.state, party.pan) : null,
         pan: party.pan ?? null,
         placeOfSupply: party.state ?? null,
-        country: party.country ?? null,
-        foreignTaxId: party.foreignTaxId ?? null,
-        exportRoute: party.exportRoute ?? null,
-        currency: party.currency ?? 'INR',
         isGta: party.isGta ?? false,
         city: party.city,
         creditDays: party.creditDays,
@@ -203,7 +195,7 @@ async function main() {
   const bars = categoryId('Bars & rods', categoryId('Iron & Steel'));
   const specials = [
     { partyId: partyId('Alipurduar Constructions'), itemId: tmt12, categoryId: null, kind: 'NET' as const, value: 59.75, notes: 'Dev data: contract rate' },
-    { partyId: partyId('Druk Builders Pvt Ltd'), itemId: null, categoryId: bars, kind: 'DISCOUNT' as const, value: 2, notes: 'Dev data: 2% off the day rate on bars' },
+    { partyId: partyId('Jalpaiguri Builders Pvt Ltd'), itemId: null, categoryId: bars, kind: 'DISCOUNT' as const, value: 2, notes: 'Dev data: 2% off the day rate on bars' },
   ];
   for (const special of specials) {
     const found = await prisma.specialRate.findFirst({ where: { partyId: special.partyId, itemId: special.itemId, categoryId: special.categoryId } });
@@ -235,9 +227,9 @@ async function main() {
       targets: { create: [{ itemId: items.get('BIND-WIRE-18')! }] },
     },
     {
-      name: 'Bhutan big order',
-      description: '1% off orders of ₹2,00,000 or more for buyers in Bhutan, up to ₹5,000',
-      level: 'ORDER', benefit: 'PERCENT', value: 1, maxDiscount: 5000, minValue: 200000, partyScope: 'OVERSEAS',
+      name: 'Big order',
+      description: '1% off orders of ₹2,00,000 or more, up to ₹5,000',
+      level: 'ORDER', benefit: 'PERCENT', value: 1, maxDiscount: 5000, minValue: 200000, partyScope: 'ALL',
       rateSources: ['SHEET', 'SPECIAL', 'MANUAL'], validFrom: day(addDays(weekStart, -7)),
     },
     {
@@ -255,18 +247,16 @@ async function main() {
 
   // Number formats the documents below need, from the start of this financial
   // year; a series that already has a format is left alone.
-  const FORMATS: { kind: 'PURCHASE_ORDER' | 'PURCHASE' | 'QUOTATION' | 'SALES_INVOICE' | 'EXPORT_INVOICE' | 'STOCK_TRANSFER' | 'STOCK_JOURNAL' | 'RECEIPT' | 'PAYMENT' | 'EXPENSE' | 'SHIPMENT'; pattern: string }[] = [
+  const FORMATS: { kind: 'PURCHASE_ORDER' | 'PURCHASE' | 'QUOTATION' | 'SALES_INVOICE' | 'STOCK_TRANSFER' | 'STOCK_JOURNAL' | 'RECEIPT' | 'PAYMENT' | 'EXPENSE'; pattern: string }[] = [
     { kind: 'PURCHASE_ORDER', pattern: 'PO/{FY}/{SEQ:4}' },
     { kind: 'PURCHASE', pattern: 'PUR/{FY}/{SEQ:4}' },
     { kind: 'QUOTATION', pattern: 'QT/{FY}/{SEQ:4}' },
     { kind: 'SALES_INVOICE', pattern: 'INV/{FY}/{SEQ:4}' },
-    { kind: 'EXPORT_INVOICE', pattern: 'EXP/{FY}/{SEQ:4}' },
     { kind: 'STOCK_TRANSFER', pattern: 'ST/{FY}/{SEQ:4}' },
     { kind: 'STOCK_JOURNAL', pattern: 'SJ/{FY}/{SEQ:4}' },
     { kind: 'RECEIPT', pattern: 'RCT/{FY}/{SEQ:4}' },
     { kind: 'PAYMENT', pattern: 'PAY/{FY}/{SEQ:4}' },
     { kind: 'EXPENSE', pattern: 'EXPN/{FY}/{SEQ:4}' },
-    { kind: 'SHIPMENT', pattern: 'SHP/{FY}/{SEQ:4}' },
   ];
   for (const format of FORMATS) {
     const series = await prisma.numberSeries.findUnique({ where: { kind: format.kind }, select: { id: true, _count: { select: { formats: true } } } });
@@ -285,12 +275,6 @@ async function main() {
     if (!(await prisma.bankCashAccount.findUnique({ where: { name: account.name }, select: { id: true } }))) {
       await prisma.bankCashAccount.create({ data: account });
     }
-  }
-
-  // A made-up LUT for this financial year so export invoices under LUT can be
-  // tried; not a real ARN. Left alone when the year already has one.
-  if (!(await prisma.lut.findUnique({ where: { financialYear: '2026-27' }, select: { id: true } }))) {
-    await prisma.lut.create({ data: { financialYear: '2026-27', arn: 'AD1904260000DEV', validFrom: day('2026-04-01'), validTo: day('2027-03-31') } });
   }
 
   const counts = {
