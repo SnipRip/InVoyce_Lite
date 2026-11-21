@@ -2,8 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { LoadNotice } from "@/components/ui/load-notice";
-import { ApiError, saveErrorText } from "@/lib/api-client";
-import { formOptions, makePrimaryPicture, openingMovements, saveItem, saveItemGroup, saveItemPictures, useItemMasters, type ItemMasters } from "./catalog-api";
+import { formOptions, openingMovements, saveItem, saveItemGroup, useItemMasters, type ItemMasters } from "./catalog-api";
 import { CategoriesWorkspace } from "./categories-workspace";
 import { ItemActivity } from "./item-activity";
 import { ItemForm } from "./item-form";
@@ -51,22 +50,10 @@ export function ItemScreen({ itemId }: { itemId?: string }) {
             item={item}
             {...formOptions(masters)}
             gstRates={GST_RATES}
-            onMakePrimary={async (pictureId) => {
-              if (!item) return;
-              await makePrimaryPicture(item.id, pictureId);
-              await reload();
-            }}
-            onSave={async (values, overridden, pictures, onPicturesLeft) => {
+            onSave={async (values, overridden) => {
               const saved = await saveItem(masters, item, values, overridden);
-              try {
-                await saveItemPictures(saved.id, pictures, onPicturesLeft);
-              } catch (error) {
-                // The item itself is saved by now; say so, so it is not saved twice.
-                throw new ApiError(error instanceof ApiError ? error.status : 0, `Item saved, but not every picture: ${saveErrorText(error)}`);
-              } finally {
-                await reload();
-                if (!item) router.push(`/items/${saved.id}`);
-              }
+              await reload();
+              if (!item) router.push(`/items/${saved.id}`);
             }}
           />
         );

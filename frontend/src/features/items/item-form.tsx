@@ -18,9 +18,7 @@ import { HsnSummary } from "@/features/hsn/hsn-summary";
 import { ApiError } from "@/lib/api-client";
 import { formatRate } from "@/lib/format";
 import { InheritedField } from "./inherited-field";
-import { ItemPictureField } from "./item-picture-field";
 import { TodaysRateField } from "./todays-rate-field";
-import { hasPictureChanges, NO_PICTURE_CHANGES, type PictureChanges } from "./item-picture-rules";
 import { findGroup, resolveDefaults, resolveItemDefaults, type ItemCatalog } from "./item-rules";
 import { itemSchema, type ItemFormValues } from "./item-schema";
 import { suggestItemSku } from "./sku-rules";
@@ -39,19 +37,8 @@ interface ItemFormProps extends ItemFormOptions {
   catalog: ItemCatalog;
   /** The item being edited; a new item when absent. */
   item?: Item;
-  /**
-   * Saves through the backend, the pictures after the item; throws an ApiError
-   * the form shows. `onPicturesLeft` gets the picture changes still to do, so a
-   * retry after a failed upload repeats only what did not go through.
-   */
-  /** Makes a stored picture the main one (saved at once). */
-  onMakePrimary?: (pictureId: string) => Promise<void>;
-  onSave: (
-    values: ItemFormValues,
-    overridden: ReadonlySet<Overridable>,
-    pictures: PictureChanges,
-    onPicturesLeft: (left: PictureChanges) => void,
-  ) => Promise<void>;
+  /** Saves through the backend; throws an ApiError the form shows. */
+  onSave: (values: ItemFormValues, overridden: ReadonlySet<Overridable>) => Promise<void>;
 }
 
 export const saveErrorText = (error: unknown) =>
@@ -66,13 +53,12 @@ const STEP_FIELDS = [["name", "sku", "categoryId", "subCategoryId", "brand", "de
 // The item form, in this order: basics, units, tax, sales, purchase,
 // inventory. HSN, GST rate and unit are inherited from the category tree and
 // only stored on the item when it is changed here.
-export function ItemForm({ catalog, item, brands, units, godowns, gstRates, onSave, onMakePrimary }: ItemFormProps) {
+export function ItemForm({ catalog, item, brands, units, godowns, gstRates, onSave }: ItemFormProps) {
   const isNew = !item;
   const group = findGroup(catalog, item?.groupId);
   const overrides = useOverrides(item?.overrides);
   const { overridden } = overrides;
   const [result, setResult] = useState<{ tone: "success" | "error"; text: string } | null>(null);
-  const [pictures, setPictures] = useState<PictureChanges>(NO_PICTURE_CHANGES);
   const [step, setStep] = useState(0);
 
   const {
@@ -81,10 +67,9 @@ export function ItemForm({ catalog, item, brands, units, godowns, gstRates, onSa
     handleSubmit,
     setValue,
     reset,
-    formState: { errors, isDirty: fieldsDirty, isSubmitting },
+    formState: { errors, isDirty, isSubmitting },
   } = useForm<ItemFormValues>({ resolver: zodResolver(itemSchema), defaultValues: toItemFormValues(item, godowns, item && resolveItemDefaults(catalog, item).hsn.value) });
   const alternateUnits = useFieldArray({ control, name: "alternateUnits" });
-  const isDirty = fieldsDirty || hasPictureChanges(pictures);
 
   const [categoryId, subCategoryId, unitOverride, conversions, hsn, name, brand, reportingUnit] = useWatch({
     control,
@@ -113,10 +98,9 @@ export function ItemForm({ catalog, item, brands, units, godowns, gstRates, onSa
     async (values) => {
       setResult(null);
       try {
-        await onSave(values, overridden, pictures, setPictures);
+        await onSave(values, overridden);
         // The saved values become the new starting point for "Discard changes".
         reset(values);
-        setPictures(NO_PICTURE_CHANGES);
         setResult({ tone: "success", text: `${values.name} saved.` });
       } catch (error) {
         setResult({ tone: "error", text: saveErrorText(error) });
@@ -243,7 +227,6 @@ export function ItemForm({ catalog, item, brands, units, godowns, gstRates, onSa
                   />
                   <TextField label="Description" placeholder="Grade, make, length" error={errors.description?.message} {...register("description")} />
                 </div>
-                <ItemPictureField name={name} stored={item?.pictures ?? []} changes={pictures} onChange={setPictures} onMakePrimary={item ? onMakePrimary : undefined} />
                 {group && item?.attributeValues && (
                   <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-muted">
                     Attributes:
@@ -510,7 +493,6 @@ export function ItemForm({ catalog, item, brands, units, godowns, gstRates, onSa
               tabIndex={-1}
               onClick={() => {
                 reset();
-                setPictures(NO_PICTURE_CHANGES);
                 setResult(null);
                 overrides.restore();
               }}

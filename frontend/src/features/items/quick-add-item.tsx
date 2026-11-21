@@ -40,7 +40,7 @@ interface QuickAddItemProps {
 }
 
 // A new item from the "+" beside an item picker on any voucher. Two short
-// steps; units in other measures, pictures and the description stay on the
+// steps; units in other measures and the description stay on the
 // item's own page.
 export function QuickAddItemDialog(props: QuickAddItemProps) {
   const { masters } = useItemMasters();
@@ -256,7 +256,7 @@ function QuickAddItemForm({ masters, open, onOpenChange, onCreated }: QuickAddIt
           {...register("sku")}
         />
       </div>
-      <p className={`${fullWidth} text-xs font-medium text-muted`}>Pictures, other units and the description can be added later on the item&rsquo;s page.</p>
+      <p className={`${fullWidth} text-xs font-medium text-muted`}>Other units and the description can be added later on the item&rsquo;s page.</p>
     </>
   );
 

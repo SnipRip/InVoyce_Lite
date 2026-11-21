@@ -24,6 +24,7 @@ import {
 import { settleMsme, type MsmeFacts } from './party-branch-rules.js';
 import { assertGstinsFree, saveChildren } from './party-children.js';
 import { partyInclude, toPartyView, type PartyView } from './party-view.js';
+import { lockRows } from '../database/sql.js';
 
 // A party sits in Customers, Vendors or both, so a change needs the
 // permission of every list it is in (before and after the change).
@@ -148,7 +149,7 @@ export class PartiesService {
         // Receipts or payments may already settle the opening balance: it cannot
         // fall below what they settled, nor turn the other way. The party row is
         // locked as a settlement locks it, so the two cannot cross.
-        await tx.$queryRaw`SELECT 1 FROM "Party" WHERE "id" = ${id}::uuid FOR UPDATE`;
+        await lockRows(tx, 'Party', id);
         const settled = await tx.settlementAllocation.aggregate({
           where: { openingPartyId: id, settlement: { cancelledAt: null } },
           _sum: { amount: true },

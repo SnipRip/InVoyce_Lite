@@ -255,7 +255,6 @@ export function InvoiceDetail({ initialInvoice, party: customer, issuer, bank, o
             einvoice={needsEinvoice(party, issuedAs)}
             onSave={async (kind, document) => keep(await saveInvoiceDocument(invoice.id, kind, document))}
             onRemove={async (kind) => keep(await removeInvoiceDocument(invoice.id, kind))}
-            onFilesChanged={onChanged}
           />
         )}
       </div>

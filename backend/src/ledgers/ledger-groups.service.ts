@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable } from '@nestjs/comm
 import { definedFields } from '../common/dto/defined-fields.js';
 import { assertLedgerNameFree } from '../common/accounts/ledger-names.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { lockLedgerGroups } from '../database/sql.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import type { CreateLedgerGroupDto } from './dto/create-ledger-group.dto.js';
 import type { UpdateLedgerGroupDto } from './dto/update-ledger-group.dto.js';
@@ -14,7 +15,7 @@ type Tx = Prisma.TransactionClient;
 // reads it and checks the change against it in one transaction. The table
 // is locked so two saves cannot build a loop between them.
 async function loadTree(tx: Tx) {
-  await tx.$executeRaw`LOCK TABLE "LedgerGroup" IN SHARE ROW EXCLUSIVE MODE`;
+  await lockLedgerGroups(tx);
   return groupMap(await tx.ledgerGroup.findMany());
 }
 

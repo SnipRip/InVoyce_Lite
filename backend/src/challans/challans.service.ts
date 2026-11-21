@@ -8,6 +8,7 @@ import { challanLinesProblem } from './challan-rules.js';
 import { challanStock } from './challan-stock.js';
 import { challanInclude, toChallanView, type ChallanView } from './challan-views.js';
 import type { CreateChallanDto } from './dto/challan.dto.js';
+import { lockRows } from '../database/sql.js';
 
 const fail = (message: string | null) => {
   if (message) throw new BadRequestException(message);
@@ -41,7 +42,7 @@ export class ChallansService {
         if (!party || !party.isCustomer) fail('Pick a customer');
         if (party!.isArchived) fail(`${party!.displayName} is archived`);
         await liveGodown(tx, dto.godownId);
-        await tx.$queryRaw`SELECT 1 FROM "Godown" WHERE "id" = ${dto.godownId}::uuid FOR UPDATE`;
+        await lockRows(tx, 'Godown', dto.godownId);
         if (dto.quotationId) {
           const quotation = await tx.quotation.findUnique({ where: { id: dto.quotationId }, select: { partyId: true, status: true, number: true } });
           if (!quotation || quotation.partyId !== dto.partyId) fail('The quotation is for another customer');
@@ -90,8 +91,8 @@ export class ChallansService {
   /** An open challan only: the goods it held are free again and its number is cancelled. */
   cancel(id: string, reason: string): Promise<ChallanView> {
     return this.prisma.$transaction(async (tx) => {
-      const [current] = await tx.$queryRaw<{ status: string; issuedNumberId: string }[]>`
-        SELECT "status", "issuedNumberId" FROM "DeliveryChallan" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      await lockRows(tx, 'DeliveryChallan', id);
+      const current = (await tx.deliveryChallan.findUnique({ where: { id }, select: { status: true, issuedNumberId: true } }))!;
       if (!current) fail('That challan does not exist');
       if (current.status === 'CANCELLED') throw new ConflictException('This challan is already cancelled');
       if (current.status === 'INVOICED') throw new ConflictException('This challan is invoiced; cancel the invoice first');

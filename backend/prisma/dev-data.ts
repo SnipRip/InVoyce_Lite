@@ -9,11 +9,11 @@
 // Names start with real-looking businesses; GSTINs carry a valid check
 // character but are made up.
 import 'dotenv/config';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { prismaClientOptions } from '../src/database/client-options.js';
 import { gstinCheckChar } from '../src/common/gst/gstin.js';
 import { PrismaClient, type GstTreatment, type Prisma } from '../src/generated/prisma/client.js';
 
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
+const prisma = new PrismaClient(prismaClientOptions(process.env.DATABASE_URL ?? ''));
 
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 const day = (iso: string) => new Date(`${iso}T00:00:00Z`);

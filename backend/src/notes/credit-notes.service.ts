@@ -12,6 +12,7 @@ import { creditNotePartyAmount } from './note-credit.js';
 import { noteDateProblem, noteLineFigures, noteTotals, settleOnDocument, splitOf, withoutGstProblem, type NoteLineFigures } from './note-rules.js';
 import { creditUsedElsewhere } from './note-allocations.service.js';
 import { creditNoteInclude, toCreditNoteView, type CreditNoteView } from './note-views.js';
+import { lockRows } from '../database/sql.js';
 
 type Tx = Prisma.TransactionClient;
 const n = (value: Prisma.Decimal | null) => toNumber(value) ?? 0;
@@ -51,7 +52,8 @@ export class CreditNotesService {
   create(dto: CreateCreditNoteDto, userId: string): Promise<CreditNoteView> {
     return this.prisma.$transaction(
       async (tx) => {
-        const [locked] = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Invoice" WHERE "id" = ${dto.invoiceId}::uuid FOR UPDATE`;
+        await lockRows(tx, 'Invoice', dto.invoiceId);
+        const locked = (await tx.invoice.findUnique({ where: { id: dto.invoiceId }, select: { id: true } }))!;
         if (!locked) fail('That invoice does not exist');
         const invoice = await tx.invoice.findUniqueOrThrow({
           where: { id: dto.invoiceId },
@@ -182,8 +184,8 @@ export class CreditNotesService {
   /** The note stops counting; goods it brought back leave again (only while untouched); the number is cancelled. */
   cancel(id: string, reason: string): Promise<CreditNoteView> {
     return this.prisma.$transaction(async (tx) => {
-      const [current] = await tx.$queryRaw<{ cancelledAt: Date | null; issuedNumberId: string }[]>`
-        SELECT "cancelledAt", "issuedNumberId" FROM "CreditNote" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      await lockRows(tx, 'CreditNote', id);
+      const current = (await tx.creditNote.findUnique({ where: { id }, select: { cancelledAt: true, issuedNumberId: true } }))!;
       if (!current) fail('That credit note does not exist');
       if (current.cancelledAt) throw new ConflictException('This credit note is already cancelled');
       const used = await creditUsedElsewhere(tx, 'CREDIT_NOTE', id);
@@ -192,7 +194,7 @@ export class CreditNotesService {
       if (lines.length) {
         const batchIds = await lockUntouchedBatches(
           tx,
-          Prisma.sql`"creditNoteLineId" IN (${Prisma.join(lines.map((line) => Prisma.sql`${line.id}::uuid`))})`,
+          { creditNoteLineId: { in: lines.map((line) => line.id) } },
           'Some of the goods it brought back have been sold or moved since, so it cannot be cancelled',
         );
         if (batchIds.length) await tx.stockBatch.deleteMany({ where: { id: { in: batchIds } } });

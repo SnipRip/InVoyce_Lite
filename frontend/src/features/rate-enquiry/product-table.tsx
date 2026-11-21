@@ -4,9 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { Fragment, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { GlassTable } from "@/components/ui/glass-table";
-import { itemPictureUrl } from "@/features/items/item-paths";
 import { ItemStockDetail } from "@/features/items/item-stock-detail";
-import { ItemThumbnail } from "@/features/items/item-thumbnail";
 import { StockCell } from "@/features/items/stock-cell";
 import { formatDate, formatPercent, formatRate } from "@/lib/format";
 import type { RateEnquiryItemView } from "@/types/rate-enquiry";
@@ -35,7 +33,7 @@ function RateNote({ item }: { item: RateEnquiryItemView }) {
 }
 
 /**
- * Search results: picture, stock, MRP, cost, the customer's rate and margin
+ * Search results: stock, MRP, cost, the customer's rate and margin
  * per item. "Stock" opens the stock enquiry under the row: each lot in stock
  * with its purchase rate and godown (client, 12 Nov 2026).
  */
@@ -74,7 +72,6 @@ export function ProductTable({ items, addedIds, onToggle, empty }: ProductTableP
               <tr>
                 <td className="text-left">
                   <div className="flex items-center gap-2.5">
-                    <ItemThumbnail src={item.pictureId ? itemPictureUrl(item.itemId, item.pictureId) : undefined} alt={item.name} size={40} />
                     <div className="min-w-0">
                       <div className="font-semibold">{item.name}</div>
                       <div className="text-xs text-muted">{detail}</div>

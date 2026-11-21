@@ -4,6 +4,7 @@
 // before it saves a new or changed name (agent/accounts-plan.md).
 import { ConflictException } from '@nestjs/common';
 import type { Prisma } from '../../generated/prisma/client.js';
+import { anyCase } from '../../database/sql.js';
 
 export type LedgerOwner = 'group' | 'ledger' | 'head' | 'bankCash' | 'loan' | 'party';
 
@@ -22,7 +23,7 @@ export async function assertLedgerNameFree(
   name: string,
   self?: { owner: LedgerOwner; id: string },
 ): Promise<void> {
-  const same = { equals: name.trim(), mode: 'insensitive' as const };
+  const same = { equals: name.trim(), ...anyCase() };
   const other = (owner: LedgerOwner) => (self?.owner === owner ? { id: { not: self.id } } : {});
   const [group, ledger, head, bankCash, loan, party] = await Promise.all([
     tx.ledgerGroup.findFirst({ where: { name: same, ...other('group') }, select: { id: true } }),

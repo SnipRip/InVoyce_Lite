@@ -7,7 +7,7 @@ invoices, shipments, LUT register or overseas parties.
 | Folder      | What it is                                  | Stack                              |
 | ----------- | ------------------------------------------- | ---------------------------------- |
 | `frontend/` | The web app staff sign in to                | Next.js 16, React 19, Tailwind CSS |
-| `backend/`  | The REST API and database access            | NestJS 12, Prisma 7, PostgreSQL 17 |
+| `backend/`  | The REST API and database access            | NestJS 12, Prisma 7, PostgreSQL 17 or MySQL / MariaDB |
 
 The browser only ever talks to the frontend. Requests to `/api/*` are forwarded
 by Next.js to the backend, so the session cookie stays same-origin.
@@ -27,6 +27,10 @@ by Next.js to the backend, so the session cookie stays same-origin.
 - Masters: customers, vendors, transporters, vehicles, HSN / SAC codes,
   company & GST setup, number series, bank & cash, ledgers
 - Sign-in with lockout, user settings, signed-in devices and roles
+
+Lite keeps no files: there are no item pictures and no scans attached to
+documents. Masters can still be imported from Excel; the workbook is read
+and never stored.
 
 The WhatsApp screen and parts of the Users screen still show **sample data**
 (each says so on screen).
@@ -66,6 +70,30 @@ npm run dev
 
 Open http://localhost:3000 and sign in with the seeded administrator.
 
+## PostgreSQL or MySQL / MariaDB
+
+Each install runs on the database the customer prefers. `DATABASE_URL` in
+`backend/.env` decides: `postgresql://…` or `mysql://…` (MySQL 8.0.13+ or
+MariaDB 10.5+, a utf8mb4 database with a `_ci` collation, so searches ignore
+case). It picks the schema, the migrations and the driver, so run
+`npm run db:generate` and `npm run build` after changing it, then
+`npm run db:deploy` and `npm run db:seed`.
+
+To try MySQL locally: `docker compose --profile mysql up -d` starts MariaDB on
+port 3307; use the commented `DATABASE_URL` in `.env.example`.
+
+`prisma/schema.prisma` is the one data model. After changing it:
+
+1. `npm run db:migrate` (against PostgreSQL) writes the PostgreSQL migration.
+2. `npm run db:mysql-schema -- <name>` regenerates `prisma/mysql/schema.prisma`
+   and writes the matching MySQL migration in `prisma/mysql/migrations`.
+3. If the PostgreSQL migration inserts or changes starting data, or adds raw
+   SQL (CHECKs, partial indexes), add the MySQL equivalent to that MySQL
+   migration by hand.
+
+Raw SQL in services goes through `src/database/sql.ts`, which writes it for
+either database. Case-insensitive filters use `anyCase()` from the same file.
+
 ## Checks
 
 | Where       | Command                                              |
@@ -77,10 +105,11 @@ Open http://localhost:3000 and sign in with the seeded administrator.
 
 ```
 backend/
-  prisma/            schema.prisma (data model), seed.ts (first admin)
+  prisma/            schema.prisma (data model), seed.ts (first admin),
+                     mysql/ (generated MySQL schema and migrations)
   src/
     config/          environment variable validation
-    database/        Prisma client as a NestJS service
+    database/        Prisma client as a NestJS service; sql.ts for raw SQL
     common/          guards, decorators and types shared by all modules
     auth/            login, sessions, password hashing and policy
     users/           the signed-in user's own profile and password

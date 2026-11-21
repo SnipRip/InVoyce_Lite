@@ -97,7 +97,7 @@ export class SalePricingService {
     const itemIds = [...new Set(input.lines.map((line) => line.itemId))];
     const [facts, offered] = await Promise.all([
       loadItemFacts(tx, itemIds, input.date),
-      this.options.forLines({ partyId: input.partyId, date: input.date, itemIds, excludeQuotationId: input.excludeQuotationId }),
+      this.options.forLines({ partyId: input.partyId, date: input.date, itemIds, excludeQuotationId: input.excludeQuotationId }, tx),
     ]);
     const offeredOf = new Map(offered.map((row) => [row.itemId, row]));
 

@@ -12,7 +12,6 @@ import { DISPATCH_DOCUMENTS, type DispatchDocumentType } from "./dispatch-docume
 import { isDocumentRequired } from "./invoice-rules";
 import type { DispatchDocument, DispatchDocumentKind, Invoice } from "./types";
 import { formatDate } from "@/lib/format";
-import { DocumentFiles } from "./document-files";
 
 interface DispatchDocumentsPanelProps {
   invoice: Invoice;
@@ -22,15 +21,13 @@ interface DispatchDocumentsPanelProps {
   /** Saved on the server; a refusal throws and shows on the form. */
   onSave: (kind: DispatchDocumentKind, document: DispatchDocument) => Promise<void>;
   onRemove: (kind: DispatchDocumentKind) => Promise<void>;
-  /** After a file is added or removed: reload the invoice. */
-  onFilesChanged: () => Promise<void>;
 }
 
 const STAGES = ["E-invoice", "Dispatch"] as const;
 
 // Everything that follows the bill, in the order it happens: the IRN on a
 // B2B invoice, and the e-way bill above ₹50,000.
-export function DispatchDocumentsPanel({ invoice, grandTotal, einvoice, onSave, onRemove, onFilesChanged }: DispatchDocumentsPanelProps) {
+export function DispatchDocumentsPanel({ invoice, grandTotal, einvoice, onSave, onRemove }: DispatchDocumentsPanelProps) {
   const [editing, setEditing] = useState<DispatchDocumentType | null>(null);
   const types = DISPATCH_DOCUMENTS;
   const isRequired = (type: DispatchDocumentType) => isDocumentRequired(type.kind, grandTotal, einvoice);
@@ -48,7 +45,7 @@ export function DispatchDocumentsPanel({ invoice, grandTotal, einvoice, onSave, 
       <div className="flex flex-wrap items-center gap-2">
         <CardTitle>Transport documents</CardTitle>
         <StatusChip tone={done === required.length ? "success" : "warning"}>
-          {done} of {required.length} attached
+          {done} of {required.length} recorded
         </StatusChip>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-ink/10" aria-hidden="true">
@@ -86,9 +83,6 @@ export function DispatchDocumentsPanel({ invoice, grandTotal, einvoice, onSave, 
                             .join("")}
                         </span>
                       ) : null}
-                      {document && (
-                        <DocumentFiles invoiceId={invoice.id} kind={type.kind} files={document.files ?? []} canEdit={canAttach} onChanged={onFilesChanged} />
-                      )}
                       {document ? null : (
                         <span className="text-xs font-medium text-muted">{type.purpose}</span>
                       )}
@@ -97,10 +91,10 @@ export function DispatchDocumentsPanel({ invoice, grandTotal, einvoice, onSave, 
                       variant={document ? "neutral" : "outline"}
                       disabled={!canAttach}
                       onClick={() => setEditing(type)}
-                      aria-label={document ? `Edit ${type.name}` : `Attach ${type.name}`}
+                      aria-label={document ? `Edit ${type.name}` : `Add ${type.name}`}
                       className={document ? "w-11 px-0" : undefined}
                     >
-                      {document ? <Pencil aria-hidden="true" className="size-4" /> : "Attach"}
+                      {document ? <Pencil aria-hidden="true" className="size-4" /> : "Add"}
                     </Button>
                   </li>
                 );
@@ -113,7 +107,7 @@ export function DispatchDocumentsPanel({ invoice, grandTotal, einvoice, onSave, 
       <GlassModal
         open={editing !== null}
         onOpenChange={(open) => !open && setEditing(null)}
-        title={editing ? `${invoice.documents[editing.kind] ? "Edit" : "Attach"} ${editing.name.toLowerCase()}` : ""}
+        title={editing ? `${invoice.documents[editing.kind] ? "Edit" : "Add"} ${editing.name.toLowerCase()}` : ""}
         description={editing ? `${editing.purpose}. For invoice ${invoice.number}.` : undefined}
       >
         {editing && (

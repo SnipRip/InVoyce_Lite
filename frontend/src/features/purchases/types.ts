@@ -68,8 +68,6 @@ export interface Bill {
   paid: number;
   /** Taken off by live debit notes. */
   debited: number;
-  /** Name of the uploaded scan, once file storage exists. */
-  fileName?: string;
   notes?: string;
   /** The bill as saved, with the figures the backend worked out (landed rates, godown, order). */
   stored?: PurchaseBillView;

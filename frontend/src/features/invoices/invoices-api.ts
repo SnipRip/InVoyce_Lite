@@ -30,7 +30,6 @@ const toDocuments = (view: InvoiceView): Invoice["documents"] =>
         number: document.number,
         date: document.date,
         details: Object.fromEntries(Object.entries(document.details).map(([key, value]) => [key, String(value)])),
-        files: document.files,
       } satisfies DispatchDocument,
     ]),
   );

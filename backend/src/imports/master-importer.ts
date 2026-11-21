@@ -7,6 +7,7 @@ import { validate, type ValidationError } from 'class-validator';
 import type { AuthContext } from '../common/types/authenticated-request.js';
 import { RowProblem, type ImportColumn } from './import-cells.js';
 import type { RefBook, RefKind } from './ref-book.js';
+import { anyCase } from '../database/sql.js';
 
 export interface ImportContext {
   auth: AuthContext;
@@ -59,4 +60,4 @@ export const pick = (values: Record<string, unknown>, fields: string[]) =>
 export const textOf = (value: unknown) => (typeof value === 'string' || typeof value === 'number' ? String(value) : '');
 
 /** Same-name match ignoring case, for natural keys. */
-export const sameText = (value: unknown) => ({ equals: textOf(value), mode: 'insensitive' as const });
+export const sameText = (value: unknown) => ({ equals: textOf(value), ...anyCase() });

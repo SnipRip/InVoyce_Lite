@@ -11,8 +11,7 @@ import type { BrandView, CategoryView, GodownView, ItemGroupView, ItemView, SubC
 import type { CategoryDraft } from "./category-editor";
 import type { ItemGroupFormValues } from "./item-group-schema";
 import type { ItemCatalog } from "./item-rules";
-import type { PictureChanges } from "./item-picture-rules";
-import { CATEGORIES_PATH, ITEM_GROUPS_PATH, ITEMS_PATH, itemPicturesPath, itemPictureUrl } from "./item-paths";
+import { CATEGORIES_PATH, ITEM_GROUPS_PATH, ITEMS_PATH } from "./item-paths";
 import type { ItemFormValues } from "./item-schema";
 import type { Category, Item, ItemDefaults, ItemGroup, StockMovement } from "./types";
 import { NONE, type Overridable } from "./use-overrides";
@@ -80,7 +79,6 @@ const toItem = (view: ItemView, units: UnitView[], brands: BrandView[]): Item =>
   stock: view.stock,
   stockByGodown: view.stockByGodown,
   reorderLevel: view.reorderLevel,
-  pictures: view.pictureIds.map((id) => ({ id, url: itemPictureUrl(view.id, id) })),
 });
 
 /**
@@ -187,36 +185,11 @@ function itemBody(masters: ItemMasters, values: ItemFormValues, overridden: Read
   };
 }
 
-/** Shows this stored picture first for the item everywhere. */
-export const makePrimaryPicture = (itemId: string, pictureId: string) => apiRequest(`${itemPicturesPath(itemId)}/${pictureId}/primary`, { method: "PUT" });
-
 export function saveItem(masters: ItemMasters, item: Item | undefined, values: ItemFormValues, overridden: ReadonlySet<Overridable>) {
   const body = itemBody(masters, values, overridden, !item);
   return item
     ? apiRequest<ItemView>(`${ITEMS_PATH}/${item.id}`, { method: "PATCH", body })
     : apiRequest<ItemView>(ITEMS_PATH, { method: "POST", body });
-}
-
-/**
- * Removes, then uploads, the item's pictures one by one (removing first makes
- * room under the limit). Stops at the first failure and throws an ApiError;
- * `onProgress` gets what is still to do after each step, so a retry repeats
- * nothing that went through.
- */
-export async function saveItemPictures(itemId: string, changes: PictureChanges, onProgress: (left: PictureChanges) => void) {
-  const left = { added: [...changes.added], removed: [...changes.removed] };
-  while (left.removed.length > 0) {
-    await apiRequest(`${itemPicturesPath(itemId)}/${left.removed[0]}`, { method: "DELETE" });
-    left.removed.shift();
-    onProgress({ ...left });
-  }
-  while (left.added.length > 0) {
-    const body = new FormData();
-    body.append("file", left.added[0].file);
-    await apiRequest<{ id: string }>(itemPicturesPath(itemId), { method: "POST", body });
-    left.added.shift();
-    onProgress({ ...left });
-  }
 }
 
 export function saveItemGroup(

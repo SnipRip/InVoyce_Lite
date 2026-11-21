@@ -9,6 +9,7 @@ import type { CreateDebitNoteDto } from './dto/note.dto.js';
 import { noteDateProblem, noteLineFigures, noteTotals, settleOnDocument, splitOf, withoutGstProblem, type NoteLineFigures } from './note-rules.js';
 import { creditUsedElsewhere } from './note-allocations.service.js';
 import { debitNoteInclude, toDebitNoteView, type DebitNoteView } from './note-views.js';
+import { lockRows } from '../database/sql.js';
 
 const n = (value: Prisma.Decimal | null) => toNumber(value) ?? 0;
 const fail = (message: string | null) => {
@@ -38,7 +39,8 @@ export class DebitNotesService {
   create(dto: CreateDebitNoteDto, userId: string): Promise<DebitNoteView> {
     return this.prisma.$transaction(
       async (tx) => {
-        const [locked] = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "PurchaseBill" WHERE "id" = ${dto.billId}::uuid FOR UPDATE`;
+        await lockRows(tx, 'PurchaseBill', dto.billId);
+        const locked = (await tx.purchaseBill.findUnique({ where: { id: dto.billId }, select: { id: true } }))!;
         if (!locked) fail('That bill does not exist');
         const bill = await tx.purchaseBill.findUniqueOrThrow({
           where: { id: dto.billId },
@@ -106,7 +108,8 @@ export class DebitNotesService {
           if (figure.quantity > 0) {
             if (!line!.batch) fail(`${line!.item.name}: this bill's stock is not on record`);
             // The goods leave this bill's own batch, locked so a sale cannot take them meanwhile.
-            const [batch] = await tx.$queryRaw<{ remaining: Prisma.Decimal }[]>`SELECT "remaining" FROM "StockBatch" WHERE "id" = ${line!.batch!.id}::uuid FOR UPDATE`;
+            await lockRows(tx, 'StockBatch', line!.batch!.id);
+            const batch = await tx.stockBatch.findUniqueOrThrow({ where: { id: line!.batch!.id }, select: { remaining: true } });
             const left = n(batch.remaining);
             if (left < figure.quantity) fail(`${line!.item.name}: only ${left} from this bill is still in stock; the rest has been sold or moved`);
             await tx.stockBatch.update({ where: { id: line!.batch!.id }, data: { remaining: { decrement: figure.quantity } } });
@@ -170,15 +173,15 @@ export class DebitNotesService {
   /** The note stops counting; goods it sent back return to their batch; the number is cancelled. */
   cancel(id: string, reason: string): Promise<DebitNoteView> {
     return this.prisma.$transaction(async (tx) => {
-      const [current] = await tx.$queryRaw<{ cancelledAt: Date | null; issuedNumberId: string }[]>`
-        SELECT "cancelledAt", "issuedNumberId" FROM "DebitNote" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      await lockRows(tx, 'DebitNote', id);
+      const current = (await tx.debitNote.findUnique({ where: { id }, select: { cancelledAt: true, issuedNumberId: true } }))!;
       if (!current) fail('That debit note does not exist');
       if (current.cancelledAt) throw new ConflictException('This debit note is already cancelled');
       const used = await creditUsedElsewhere(tx, 'DEBIT_NOTE', id);
       if (used.length) throw new ConflictException(`This note's credit was refunded by ${used.join(', ')}. Cancel the refund first.`);
       const lines = await tx.debitNoteLine.findMany({ where: { debitNoteId: id, batchId: { not: null } }, select: { batchId: true, quantity: true }, orderBy: { batchId: 'asc' } });
       for (const line of lines) {
-        await tx.$queryRaw`SELECT 1 FROM "StockBatch" WHERE "id" = ${line.batchId}::uuid FOR UPDATE`;
+        await lockRows(tx, 'StockBatch', line.batchId!);
         await tx.stockBatch.update({ where: { id: line.batchId! }, data: { remaining: { increment: line.quantity } } });
       }
       await this.numbers.cancel(tx, current.issuedNumberId);

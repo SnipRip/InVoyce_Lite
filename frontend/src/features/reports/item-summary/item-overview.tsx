@@ -3,7 +3,6 @@ import { FactTile } from "@/components/ui/fact-tile";
 import { CardTitle, GlassCard } from "@/components/ui/glass-card";
 import { StatTile } from "@/components/ui/stat-tile";
 import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
-import { itemPictureUrl } from "@/features/items/item-paths";
 import { formatDate, formatInr, formatPercent, formatQuantity, formatRate } from "@/lib/format";
 import type { ItemSummaryView } from "./types";
 
@@ -18,10 +17,6 @@ export function ItemOverview({ data }: { data: ItemSummaryView }) {
   return (
     <>
       <GlassCard className="flex flex-wrap items-start gap-4">
-        {item.pictureId && (
-          // eslint-disable-next-line @next/next/no-img-element -- served by our API, sized here
-          <img src={itemPictureUrl(item.id, item.pictureId)} alt="" className="size-20 shrink-0 rounded-(--radius-tile) object-cover" />
-        )}
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold">{item.name}</h2>

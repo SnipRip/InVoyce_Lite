@@ -10,6 +10,7 @@ import type { PurchaseOrderDto } from './dto/purchase-order.dto.js';
 import { liveGodown, liveVendor, ourRegistration } from './purchase-context.js';
 import { billFigures, billTax } from './purchase-rules.js';
 import { orderInclude, toOrderView, type PurchaseOrderView } from './purchase-views.js';
+import { lockRows } from '../database/sql.js';
 
 type Db = Prisma.TransactionClient;
 
@@ -83,8 +84,8 @@ export class PurchaseOrdersService {
   }
 
   private async lockUnreceived(tx: Db, id: string, done: 'changed' | 'cancelled') {
-    const [order] = await tx.$queryRaw<{ status: string; issuedNumberId: string | null }[]>`
-      SELECT "status", "issuedNumberId" FROM "PurchaseOrder" WHERE "id" = ${id}::uuid FOR UPDATE`;
+    await lockRows(tx, 'PurchaseOrder', id);
+    const order = (await tx.purchaseOrder.findUnique({ where: { id }, select: { status: true, issuedNumberId: true } }))!;
     if (!order) throw new BadRequestException('That order does not exist');
     if (order.status !== 'OPEN') throw new ConflictException(`Only an open order can be ${done}`);
     const received = await tx.purchaseBill.count({ where: { purchaseOrderId: id, status: 'OPEN' } });

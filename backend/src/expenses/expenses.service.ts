@@ -17,6 +17,7 @@ import { liveSettlementNumbers, settledOf } from '../settlements/settlements.ser
 import type { CreateExpenseDto, ExpenseQueryDto } from './dto/expense.dto.js';
 import { allocationProblem, expenseFigures, headProblem, PAYEE_TAX, payeeProblem, paymentProblem, vendorTaxProblem } from './expense-rules.js';
 import { expenseInclude, toExpenseView, type ExpenseRow, type ExpenseView } from './expense-views.js';
+import { lockRows } from '../database/sql.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -71,7 +72,7 @@ export class ExpensesService {
       fail(paymentProblem({ accountId, mode, vendorId }));
       if (dto.date > today) fail('The date is after today');
 
-      await tx.$queryRaw`SELECT 1 FROM "AccountHead" WHERE "id" = ${dto.headId}::uuid FOR SHARE`;
+      await lockRows(tx, 'AccountHead', dto.headId, 'share');
       const found = await tx.accountHead.findUnique({ where: { id: dto.headId } });
       const head = found && { ...found, gstRatePct: found.gstRatePct === null ? null : toNumber(found.gstRatePct) };
       fail(headProblem(head));
@@ -81,7 +82,7 @@ export class ExpensesService {
       let tax: BillTax = withoutCredit(company, dto.gstBill === false ? PAYEE_TAX.NO_BILL : PAYEE_TAX.GST_BILL);
       let dueDate: string | null = null;
       if (vendorId) {
-        await tx.$queryRaw`SELECT 1 FROM "Party" WHERE "id" = ${vendorId}::uuid FOR UPDATE`;
+        await lockRows(tx, 'Party', vendorId);
         const vendor = await liveVendor(tx, vendorId);
         tax = billTax(company, vendor, null);
         fail(vendorTaxProblem(tax));
@@ -95,14 +96,14 @@ export class ExpensesService {
       }
 
       if (dto.allocation === 'ITEM_COST') {
-        const [bill] = await tx.$queryRaw<{ kind: string; status: string; reference: string }[]>`
-          SELECT "kind", "status", "reference" FROM "PurchaseBill" WHERE "id" = ${targetId}::uuid FOR UPDATE`;
+        await lockRows(tx, 'PurchaseBill', targetId!);
+        const bill = (await tx.purchaseBill.findUnique({ where: { id: targetId! }, select: { kind: true, status: true, reference: true } }))!;
         if (!bill || bill.kind !== 'GOODS') fail('Add the cost to a goods bill');
         if (bill.status !== 'OPEN') fail(`Bill ${bill.reference} is void`);
       }
       if (dto.allocation === 'INVOICE') {
-        const [invoice] = await tx.$queryRaw<{ status: string; number: string }[]>`
-          SELECT "status", "number" FROM "Invoice" WHERE "id" = ${targetId}::uuid FOR UPDATE`;
+        await lockRows(tx, 'Invoice', targetId!);
+        const invoice = (await tx.invoice.findUnique({ where: { id: targetId! }, select: { status: true, number: true } }))!;
         if (!invoice) fail('That invoice does not exist');
         if (invoice.status !== 'ISSUED') fail(`Invoice ${invoice.number} is cancelled`);
       }
@@ -141,13 +142,13 @@ export class ExpensesService {
   /** Cancels an expense entered by mistake: it posts nothing, its number stays cancelled, a purchase it landed on is re-worked. */
   cancel(id: string, reason: string): Promise<ExpenseView> {
     return this.prisma.$transaction(async (tx) => {
-      const [expense] = await tx.$queryRaw<{ issuedNumberId: string; cancelledAt: Date | null; billId: string | null }[]>`
-        SELECT "issuedNumberId", "cancelledAt", "billId" FROM "Expense" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      await lockRows(tx, 'Expense', id);
+      const expense = (await tx.expense.findUnique({ where: { id }, select: { issuedNumberId: true, cancelledAt: true, billId: true } }))!;
       if (!expense) throw new NotFoundException('That expense does not exist');
       if (expense.cancelledAt) throw new ConflictException('This expense is already cancelled');
       const payments = await liveSettlementNumbers(tx, { expenseId: id });
       if (payments.length) throw new ConflictException(`Payments or note credits are applied to this expense (${payments.join(', ')}). Cancel them first.`);
-      if (expense.billId) await tx.$queryRaw`SELECT 1 FROM "PurchaseBill" WHERE "id" = ${expense.billId}::uuid FOR UPDATE`;
+      if (expense.billId) await lockRows(tx, 'PurchaseBill', expense.billId);
       await this.numbers.cancel(tx, expense.issuedNumberId);
       await tx.expense.update({ where: { id }, data: { cancelledAt: new Date(), cancelReason: reason } });
       if (expense.billId) await landBill(tx, expense.billId);

@@ -2,6 +2,7 @@
 // Bills take the vendor's billing branch, quotations and invoices the
 // customer's bill-to branch (GST) and ship-to (where the goods go).
 import { BadRequestException } from '@nestjs/common';
+import { lockRows } from '../database/sql.js';
 import type { GstTreatment, Prisma } from '../generated/prisma/client.js';
 
 type Db = Prisma.TransactionClient;
@@ -25,9 +26,11 @@ export interface BranchRow {
  */
 export async function partyBranch(db: Db, partyId: string, branchId: string | null | undefined, use: 'billing' | 'delivery'): Promise<BranchRow | null> {
   if (!branchId) return null;
-  const [row] = await db.$queryRaw<(BranchRow & { partyId: string; isArchived: boolean })[]>`
-    SELECT "id", "partyId", "name", "kind", "treatment", "gstin", "placeOfSupply", "addressLine", "city", "pin", "isArchived"
-    FROM "PartyBranch" WHERE "id" = ${branchId}::uuid FOR SHARE`;
+  await lockRows(db, 'PartyBranch', branchId, 'share');
+  const row = await db.partyBranch.findUnique({
+    where: { id: branchId },
+    select: { id: true, partyId: true, name: true, kind: true, treatment: true, gstin: true, placeOfSupply: true, addressLine: true, city: true, pin: true, isArchived: true },
+  });
   if (!row || row.partyId !== partyId) throw new BadRequestException('That branch is not this party\'s');
   if (row.isArchived) throw new BadRequestException(`${row.name} is archived`);
   if (use === 'billing' && row.kind !== 'BRANCH') throw new BadRequestException(`${row.name} is a delivery address only; bill a branch with GST details`);

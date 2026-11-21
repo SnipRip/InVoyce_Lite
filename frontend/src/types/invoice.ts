@@ -45,8 +45,6 @@ export interface InvoiceDocumentView {
   date: string;
   details: Record<string, string | number>;
   updatedAt: string;
-  /** Scans and PDFs kept with it. */
-  files: { id: string; name: string; contentType: string; size: number }[];
 }
 
 export interface InvoiceView {

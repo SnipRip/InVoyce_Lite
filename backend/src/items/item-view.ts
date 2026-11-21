@@ -31,23 +31,18 @@ export interface ItemView extends ItemCosts {
   stock: number;
   /** On hand per godown; godowns with none are left out. */
   stockByGodown: { godownId: string; quantity: number }[];
-  /** The item's picture ids, oldest (the cover) first; each goes into its picture URL. */
-  pictureIds: string[];
 }
 
 export type ItemRow = Item & {
   alternateUnits: ItemUnitConversion[];
   openingStock: ItemOpeningStock[];
   stockBatches: CostSource['stockBatches'] & GodownSource['stockBatches'];
-  pictures: { id: string }[];
 };
 
-// Only the picture ids: lists never read the bytes.
 export const itemRowInclude = {
   alternateUnits: true,
   openingStock: true,
   stockBatches: itemCostSource.stockBatches,
-  pictures: { select: { id: true }, orderBy: { createdAt: 'asc' } },
 } as const;
 
 export function toItemView(item: ItemRow): ItemView {
@@ -84,7 +79,5 @@ export function toItemView(item: ItemRow): ItemView {
     openingStock,
     stock: stockOnHand(item),
     stockByGodown: stockByGodown(item),
-    // The primary picture first: every screen shows the first one.
-    pictureIds: [...item.pictures].sort((a, b) => Number(b.id === item.primaryPictureId) - Number(a.id === item.primaryPictureId)).map((picture) => picture.id),
   };
 }

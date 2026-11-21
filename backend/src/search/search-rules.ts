@@ -1,6 +1,7 @@
 // Pure helpers for global search: the query split into words and the Prisma
 // filter "every word appears in at least one of these fields".
 import type { DispatchDocumentKind } from '../generated/prisma/enums.js';
+import { anyCase } from '../database/sql.js';
 
 /** At most this many words are matched; more add little and cost a scan each. */
 export const MAX_WORDS = 5;
@@ -9,7 +10,7 @@ export const MAX_WORDS = 5;
 export const searchWords = (query: string) => [...new Set(query.toLowerCase().split(/\s+/).filter(Boolean))].slice(0, MAX_WORDS);
 
 /** Case-insensitive "contains" on one column. */
-export const has = (word: string) => ({ contains: word, mode: 'insensitive' as const });
+export const has = (word: string) => ({ contains: word, ...anyCase() });
 
 /** One field of a record, as a filter for a single word (a column or a relation's column). */
 export type FieldMatch<W> = (word: string) => W;

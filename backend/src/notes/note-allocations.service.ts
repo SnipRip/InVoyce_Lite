@@ -1,12 +1,12 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
-import type { SaleRegime } from '../generated/prisma/enums.js';
 import type { AllocationDto } from '../settlements/dto/settlement.dto.js';
 import { allocationProblem } from '../settlements/settlement-rules.js';
 import { SettlementsService } from '../settlements/settlements.service.js';
 import { settlesOutstanding, type PartySide } from '../journals/journal-rules.js';
 import { creditLeft, creditNotePartyAmount, debitNotePartyAmount, noteUsage, type NoteKind } from './note-credit.js';
+import { lockRows } from '../database/sql.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -76,24 +76,26 @@ export class NoteAllocationsService {
             : await tx.journalLine.findUnique({ where: { id }, select: { partyId: true } });
       if (!owner?.partyId) throw new NotFoundException(kind === 'JOURNAL' ? 'That journal line is not on a customer or vendor' : 'That note does not exist');
       const partyId = owner.partyId;
-      const [party] = await tx.$queryRaw<{ isCustomer: boolean; isVendor: boolean; isArchived: boolean; openingBalance: Prisma.Decimal; openingBalanceSide: 'RECEIVABLE' | 'PAYABLE' }[]>`
-        SELECT "isCustomer", "isVendor", "isArchived", "openingBalance", "openingBalanceSide" FROM "Party" WHERE "id" = ${partyId}::uuid FOR UPDATE`;
+      await lockRows(tx, 'Party', partyId);
+      const party = await tx.party.findUniqueOrThrow({ where: { id: partyId }, select: { isCustomer: true, isVendor: true, isArchived: true, openingBalance: true, openingBalanceSide: true } });
       let partyAmount: number;
       let side: PartySide;
       if (kind === 'CREDIT_NOTE') {
-        const [note] = await tx.$queryRaw<{ cancelledAt: Date | null; total: Prisma.Decimal; igst: Prisma.Decimal; regime: SaleRegime }[]>`
-          SELECT "cancelledAt", "total", "igst", "regime" FROM "CreditNote" WHERE "id" = ${id}::uuid FOR UPDATE`;
+        await lockRows(tx, 'CreditNote', id);
+        const note = await tx.creditNote.findUniqueOrThrow({ where: { id }, select: { cancelledAt: true, total: true, igst: true, regime: true } });
         if (note.cancelledAt) throw new ConflictException('This note is cancelled');
         partyAmount = creditNotePartyAmount(note);
         side = 'RECEIVABLE';
       } else if (kind === 'DEBIT_NOTE') {
-        const [note] = await tx.$queryRaw<{ cancelledAt: Date | null; total: Prisma.Decimal }[]>`SELECT "cancelledAt", "total" FROM "DebitNote" WHERE "id" = ${id}::uuid FOR UPDATE`;
+        await lockRows(tx, 'DebitNote', id);
+        const note = await tx.debitNote.findUniqueOrThrow({ where: { id }, select: { cancelledAt: true, total: true } });
         if (note.cancelledAt) throw new ConflictException('This note is cancelled');
         partyAmount = debitNotePartyAmount(note);
         side = 'PAYABLE';
       } else {
-        const [line] = await tx.$queryRaw<{ partySide: PartySide; debit: Prisma.Decimal; credit: Prisma.Decimal; cancelledAt: Date | null }[]>`
-          SELECT l."partySide", l."debit", l."credit", j."cancelledAt" FROM "JournalLine" l JOIN "JournalVoucher" j ON j."id" = l."journalId" WHERE l."id" = ${id}::uuid FOR UPDATE OF l`;
+        await lockRows(tx, 'JournalLine', id);
+        const found = await tx.journalLine.findUniqueOrThrow({ where: { id }, select: { partySide: true, debit: true, credit: true, journal: { select: { cancelledAt: true } } } });
+        const line = { partySide: found.partySide as PartySide, debit: found.debit, credit: found.credit, cancelledAt: found.journal.cancelledAt };
         if (line.cancelledAt) throw new ConflictException('This journal is cancelled');
         side = line.partySide;
         const figures = { debit: line.debit.toNumber(), credit: line.credit.toNumber() };

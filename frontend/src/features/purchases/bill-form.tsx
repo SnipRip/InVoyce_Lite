@@ -2,7 +2,6 @@
 
 import { billedAs, billingOptions, branchIdOf, MAIN_BRANCH } from "@/features/parties/party-branches";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Paperclip } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -432,13 +431,6 @@ export function BillForm({ vendors, catalog, purchases, godowns, company, initia
   const notesAndAttach = (
     <>
       <TextField label="Notes" placeholder="Anything about this bill" error={errors.notes?.message} {...register("notes")} />
-      <div className="flex flex-wrap items-center gap-2.5">
-        <Button variant="neutral" disabled tabIndex={-1}>
-          <Paperclip aria-hidden="true" className="size-[18px]" />
-          Attach the vendor&rsquo;s bill
-        </Button>
-        <span className="text-xs font-semibold text-muted">Uploading scans switches on when file storage is chosen.</span>
-      </div>
       {result && <FormMessage tone={result.tone} result={result}>{result.text}</FormMessage>}
     </>
   );

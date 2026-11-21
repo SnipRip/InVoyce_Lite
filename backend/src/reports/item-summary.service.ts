@@ -50,7 +50,6 @@ export interface ItemSummaryView {
     hsn: string;
     mrp: number | null;
     reorderLevel: number;
-    pictureId: string | null;
     isArchived: boolean;
   };
   stock: {
@@ -133,8 +132,6 @@ export class ItemSummaryService {
         mrp: true,
         reorderLevel: true,
         isArchived: true,
-        primaryPictureId: true,
-        pictures: { select: { id: true }, orderBy: { createdAt: 'asc' }, take: 1 },
         ...itemCostSource,
         unit: { select: { symbol: true } },
         brand: named,
@@ -361,7 +358,6 @@ export class ItemSummaryService {
         hsn: item.hsn,
         mrp: toNumber(item.mrp),
         reorderLevel: n(item.reorderLevel),
-        pictureId: item.primaryPictureId ?? item.pictures[0]?.id ?? null,
         isArchived: item.isArchived,
       },
       stock: {

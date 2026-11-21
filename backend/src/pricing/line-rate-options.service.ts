@@ -11,6 +11,8 @@ import type { LineRateOptionsDto } from './dto/line-rate-options.dto.js';
 import { resolveRate, type RateQuote, type SpecialRateFacts } from './pricing-rules.js';
 import { toSpecialRateView } from './pricing-views.js';
 
+type Db = Prisma.TransactionClient;
+
 /** A past line's rate after its typed discount, to paise. */
 const netOfDiscount = (line: { rate: Prisma.Decimal; discountPct: Prisma.Decimal }) =>
   Math.round(toNumber(line.rate) * (1 - toNumber(line.discountPct) / 100) * 100) / 100;
@@ -65,14 +67,19 @@ export interface PastRate {
 export class LineRateOptionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async forLines(dto: LineRateOptionsDto): Promise<LineRateOptionsView[]> {
-    const items = await this.prisma.item.findMany({ where: { id: { in: dto.itemIds } }, select: LINE_ITEM_SELECT });
+  /**
+   * `db`: the caller's transaction when it has one. A save must read through
+   * it, not take a second pooled connection while holding the first: enough
+   * saves at once would otherwise hold every connection and wait for ever.
+   */
+  async forLines(dto: LineRateOptionsDto, db: Db = this.prisma): Promise<LineRateOptionsView[]> {
+    const items = await db.item.findMany({ where: { id: { in: dto.itemIds } }, select: LINE_ITEM_SELECT });
     if (items.length !== dto.itemIds.length) throw new BadRequestException('An item does not exist');
-    return this.forItems(items, dto);
+    return this.forItems(items, dto, db);
   }
 
   /** The same for items already loaded with `LINE_ITEM_SELECT` (the rate enquiry loads every live item). */
-  async forItems(items: LineItemRow[], options: LineOptionsFor): Promise<LineRateOptionsView[]> {
+  async forItems(items: LineItemRow[], options: LineOptionsFor, db: Db = this.prisma): Promise<LineRateOptionsView[]> {
     if (items.length === 0) return [];
     const dto = { ...options, itemIds: items.map((item) => item.id) };
     const date = dto.date ?? todayInIndia();
@@ -82,18 +89,18 @@ export class LineRateOptionsService {
     ];
 
     const [covering, previous, specials, quoted, sold] = await Promise.all([
-      this.prisma.itemPrice.findMany({
+      db.itemPrice.findMany({
         where: { itemId: { in: dto.itemIds }, isArchived: false, validFrom: { lte: day }, validTill: { gte: day } },
       }),
       // One row per item: the entry that ended last before the date.
-      this.prisma.itemPrice.findMany({
+      db.itemPrice.findMany({
         where: { itemId: { in: dto.itemIds }, isArchived: false, validTill: { lt: day } },
         orderBy: [{ itemId: 'asc' }, { validTill: 'desc' }, { validFrom: 'desc' }],
         distinct: ['itemId'],
       }),
-      dto.partyId ? this.specialRatesFor(dto.partyId, dto.itemIds, categoryIds) : Promise.resolve([]),
-      dto.partyId ? this.lastQuoted(dto.partyId, dto.itemIds, day, dto.excludeQuotationId) : Promise.resolve(new Map<string, PastRate>()),
-      dto.partyId ? this.lastSold(dto.partyId, dto.itemIds, day) : Promise.resolve(new Map<string, PastRate>()),
+      dto.partyId ? this.specialRatesFor(db, dto.partyId, dto.itemIds, categoryIds) : Promise.resolve([]),
+      dto.partyId ? this.lastQuoted(db, dto.partyId, dto.itemIds, day, dto.excludeQuotationId) : Promise.resolve(new Map<string, PastRate>()),
+      dto.partyId ? this.lastSold(db, dto.partyId, dto.itemIds, day) : Promise.resolve(new Map<string, PastRate>()),
     ]);
     const entriesOf = byItem(covering.map(toItemPriceView));
     const previousOf = new Map(previous.map((entry) => [entry.itemId, toItemPriceView(entry)]));
@@ -136,8 +143,8 @@ export class LineRateOptionsService {
    * the date (a top-1 scan of the partyId, itemId, date index). Drafts were
    * never given to the customer and cancelled ones were withdrawn.
    */
-  private async lastQuoted(partyId: string, itemIds: string[], day: Date, excludeQuotationId?: string): Promise<Map<string, PastRate>> {
-    const lines = await this.prisma.quotationLine.findMany({
+  private async lastQuoted(db: Db, partyId: string, itemIds: string[], day: Date, excludeQuotationId?: string): Promise<Map<string, PastRate>> {
+    const lines = await db.quotationLine.findMany({
       where: {
         partyId,
         itemId: { in: itemIds },
@@ -166,8 +173,8 @@ export class LineRateOptionsService {
    * the date (a top-1 scan of the partyId, itemId, date index). A cancelled
    * invoice sold nothing.
    */
-  private async lastSold(partyId: string, itemIds: string[], day: Date): Promise<Map<string, PastRate>> {
-    const lines = await this.prisma.invoiceLine.findMany({
+  private async lastSold(db: Db, partyId: string, itemIds: string[], day: Date): Promise<Map<string, PastRate>> {
+    const lines = await db.invoiceLine.findMany({
       where: { partyId, itemId: { in: itemIds }, date: { lte: day }, invoice: { status: 'ISSUED' } },
       orderBy: [{ itemId: 'asc' }, { date: 'desc' }, { invoice: { createdAt: 'desc' } }],
       distinct: ['itemId'],
@@ -178,11 +185,11 @@ export class LineRateOptionsService {
     );
   }
 
-  private async specialRatesFor(partyId: string, itemIds: string[], categoryIds: string[]) {
-    const party = await this.prisma.party.findUnique({ where: { id: partyId }, select: { isCustomer: true } });
+  private async specialRatesFor(db: Db, partyId: string, itemIds: string[], categoryIds: string[]) {
+    const party = await db.party.findUnique({ where: { id: partyId }, select: { isCustomer: true } });
     if (!party) throw new BadRequestException('That customer does not exist');
     if (!party.isCustomer) throw new BadRequestException('Rates are quoted for customers only');
-    const rows = await this.prisma.specialRate.findMany({
+    const rows = await db.specialRate.findMany({
       where: { partyId, isArchived: false, OR: [{ itemId: { in: itemIds } }, { categoryId: { in: categoryIds } }] },
     });
     return rows.map(toSpecialRateView);

@@ -2,7 +2,6 @@
 // Category → sub-category → optional item group → item. Only items hold
 // stock; groups and categories carry defaults that items inherit.
 
-import type { ItemPicture } from "./item-picture-rules";
 
 /** Values a category, sub-category or group can set for everything below it. */
 export interface ItemDefaults {
@@ -77,8 +76,6 @@ export interface Item {
   /** On hand per godown, godowns with none left out (backend items only). */
   stockByGodown?: { godownId: string; quantity: number }[];
   reorderLevel: number;
-  /** The item's pictures for sending to clients, the cover first (backend items only). */
-  pictures?: ItemPicture[];
 }
 
 /** An inherited value with where it came from, for "From sub-category" hints. */

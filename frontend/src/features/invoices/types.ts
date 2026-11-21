@@ -32,15 +32,6 @@ export interface DispatchDocument {
   date: string;
   /** Field key → value, as defined for the kind in dispatch-documents.ts. */
   details: Record<string, string>;
-  /** Scans and PDFs kept with it (document-files.tsx). */
-  files?: DocumentFile[];
-}
-
-export interface DocumentFile {
-  id: string;
-  name: string;
-  contentType: string;
-  size: number;
 }
 
 export interface Invoice {

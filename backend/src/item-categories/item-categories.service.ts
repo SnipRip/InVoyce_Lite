@@ -9,6 +9,7 @@ import {
   type CategoryView,
   type SubCategoryView,
 } from './item-category-view.js';
+import { anyCase } from '../database/sql.js';
 
 @Injectable()
 export class ItemCategoriesService {
@@ -54,7 +55,7 @@ export class ItemCategoriesService {
     const clash = await this.prisma.itemCategory.findFirst({
       where: {
         parentId: null,
-        name: { equals: name, mode: 'insensitive' },
+        name: { equals: name, ...anyCase() },
         id: exceptId ? { not: exceptId } : undefined,
       },
       select: { id: true },

@@ -1,7 +1,6 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Paperclip } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -99,13 +98,6 @@ export function AttachDocumentForm({ type, existing, suggestions, onSave, onRemo
           />
         ))}
       </div>
-      <div className="flex flex-col gap-1">
-        <Button variant="neutral" disabled className="self-start">
-          <Paperclip aria-hidden="true" className="size-[18px]" />
-          Attach scan or PDF
-        </Button>
-        <p className="text-xs font-semibold text-muted">Uploading switches on when document storage is set up.</p>
-      </div>
       {problem && <FormMessage tone="error">{problem}</FormMessage>}
       <div className="flex flex-wrap justify-end gap-2.5">
         {existing && onRemove && (
@@ -117,7 +109,7 @@ export function AttachDocumentForm({ type, existing, suggestions, onSave, onRemo
           Cancel
         </Button>
         <Button type="submit" disabled={busy}>
-          {isSubmitting ? "Saving…" : existing ? "Save changes" : `Attach ${type.name.toLowerCase()}`}
+          {isSubmitting ? "Saving…" : existing ? "Save changes" : `Save ${type.name.toLowerCase()}`}
         </Button>
       </div>
     </form>

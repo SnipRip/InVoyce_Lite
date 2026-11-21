@@ -38,8 +38,6 @@ export class RateEnquiryService {
         name: true,
         sku: true,
         reorderLevel: true,
-        primaryPictureId: true,
-        pictures: { select: { id: true }, orderBy: { createdAt: 'asc' }, take: 1 },
         brand: { select: { name: true } },
         unit: { select: { symbol: true } },
         group: { select: unitOf },
@@ -65,7 +63,6 @@ export class RateEnquiryService {
         brandName: item.brand?.name ?? null,
         stock: stockOnHand(item),
         reorderLevel: toNumber(item.reorderLevel),
-        pictureId: item.primaryPictureId ?? item.pictures[0]?.id ?? null,
         options: options[index],
       })),
     };

@@ -2,7 +2,7 @@ import { billedAs, partyBranch } from '../parties/party-branch.js';
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { dateOnly } from '../common/dates.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { Prisma, QuotationStatus } from '../generated/prisma/client.js';
+import type { Prisma } from '../generated/prisma/client.js';
 import { inReportingUnit } from '../items/line-units.js';
 import { NumberSeriesService } from '../number-series/number-series.service.js';
 import { liveGodown, ourRegistration } from '../purchases/purchase-context.js';
@@ -17,6 +17,7 @@ import { conversionProblem, quantityOut } from './invoice-rules.js';
 import { invoiceInclude, toInvoiceView, type InvoiceView } from './invoice-views.js';
 import { freeToSend, invoiceFromChallanProblem } from '../challans/challan-rules.js';
 import { challanStock } from '../challans/challan-stock.js';
+import { lockRows } from '../database/sql.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -70,8 +71,8 @@ export class InvoicesService {
         if (dto.quotationId) await this.claimQuotation(tx, dto.quotationId, dto.partyId);
         // Raised from a delivery challan: open, same customer and godown; marked invoiced below.
         if (dto.challanId) {
-          const [challan] = await tx.$queryRaw<{ status: string; partyId: string; godownId: string; number: string }[]>`
-            SELECT "status", "partyId", "godownId", "number" FROM "DeliveryChallan" WHERE "id" = ${dto.challanId}::uuid FOR UPDATE`;
+          await lockRows(tx, 'DeliveryChallan', dto.challanId);
+          const challan = (await tx.deliveryChallan.findUnique({ where: { id: dto.challanId }, select: { status: true, partyId: true, godownId: true, number: true } }))!;
           if (!challan) fail('That delivery challan does not exist');
           fail(invoiceFromChallanProblem(challan, { partyId: dto.partyId, godownId: dto.godownId }));
         }
@@ -165,8 +166,8 @@ export class InvoicesService {
   /** Cancels an issued invoice with no live receipts, or expenses on it: its stock goes back, its number is cancelled, its quotation is open again. */
   cancel(id: string, reason: string): Promise<InvoiceView> {
     return this.prisma.$transaction(async (tx) => {
-      const [current] = await tx.$queryRaw<{ status: string; issuedNumberId: string; quotationId: string | null }[]>`
-        SELECT "status", "issuedNumberId", "quotationId" FROM "Invoice" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      await lockRows(tx, 'Invoice', id);
+      const current = (await tx.invoice.findUnique({ where: { id }, select: { status: true, issuedNumberId: true, quotationId: true } }))!;
       if (!current) fail('That invoice does not exist');
       if (current.status === 'CANCELLED') throw new ConflictException('This invoice is already cancelled');
       const receipts = await liveSettlementNumbers(tx, { invoiceId: id });
@@ -193,8 +194,8 @@ export class InvoicesService {
 
   /** Locks the quotation and marks it converted; only the same customer's sent or accepted quotation. */
   private async claimQuotation(tx: Tx, quotationId: string, partyId: string) {
-    const [quotation] = await tx.$queryRaw<{ status: QuotationStatus; partyId: string; number: string }[]>`
-      SELECT "status", "partyId", "number" FROM "Quotation" WHERE "id" = ${quotationId}::uuid FOR UPDATE`;
+    await lockRows(tx, 'Quotation', quotationId);
+    const quotation = (await tx.quotation.findUnique({ where: { id: quotationId }, select: { status: true, partyId: true, number: true } }))!;
     if (!quotation) fail('That quotation does not exist');
     if (quotation.partyId !== partyId) fail(`Quotation ${quotation.number} is for another customer`);
     const problem = conversionProblem(quotation.status);

@@ -1,7 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { dateOnly } from '../common/dates.js';
 import { PrismaService } from '../database/prisma.service.js';
-import { Prisma } from '../generated/prisma/client.js';
 import { loadItemFacts } from '../items/item-document-facts.js';
 import { NumberSeriesService } from '../number-series/number-series.service.js';
 import { liveGodown } from '../purchases/purchase-context.js';
@@ -11,6 +10,7 @@ import type { StockAdjustmentDto } from './dto/stock-move.dto.js';
 import { drawLines, lockUntouchedBatches } from './stock-move-draws.js';
 import { reasonProblem, repeatedItem, valueAt } from './stock-move-rules.js';
 import { adjustmentInclude, toAdjustmentView, type StockAdjustmentView } from './stock-move-views.js';
+import { lockRows } from '../database/sql.js';
 
 const money = (value: number) => Math.round(value * 100) / 100;
 const fail = (message: string | null) => {
@@ -107,8 +107,8 @@ export class StockAdjustmentsService {
   /** Stock written off goes back; stock added comes out again (only while untouched). The number is cancelled. */
   cancel(id: string, reason: string): Promise<StockAdjustmentView> {
     return this.prisma.$transaction(async (tx) => {
-      const [current] = await tx.$queryRaw<{ status: string; issuedNumberId: string; godownId: string; direction: string }[]>`
-        SELECT "status", "issuedNumberId", "godownId", "direction" FROM "StockAdjustment" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      await lockRows(tx, 'StockAdjustment', id);
+      const current = (await tx.stockAdjustment.findUnique({ where: { id }, select: { status: true, issuedNumberId: true, godownId: true, direction: true } }))!;
       if (!current) fail('That adjustment does not exist');
       if (current.status === 'CANCELLED') throw new ConflictException('This adjustment is already cancelled');
 
@@ -120,7 +120,7 @@ export class StockAdjustmentsService {
       if (current.direction === 'IN') {
         const batchIds = await lockUntouchedBatches(
           tx,
-          Prisma.sql`"adjustmentLineId" IN (${Prisma.join(lines.map((line) => Prisma.sql`${line.id}::uuid`))})`,
+          { adjustmentLineId: { in: lines.map((line) => line.id) } },
           'Some of the stock this added has already been sold or moved, so it cannot be cancelled',
         );
         await tx.stockBatch.deleteMany({ where: { id: { in: batchIds } } });

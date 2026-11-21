@@ -8,8 +8,9 @@
 // was already drawn from it, so an invoice's cost always matches its stock;
 // stock a transfer moved carries the new rate on into the other godown.
 import { ConflictException } from '@nestjs/common';
-import { formatDate } from '../common/dates.js';
+import { dateOnly, formatDate } from '../common/dates.js';
 import { toNumber } from '../common/decimal.js';
+import { lockItemInGodown } from '../database/sql.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { costOfDraws, openingLeft, openingRate, planFifo, type StockDraw, type StockSlice } from './fifo-rules.js';
 
@@ -30,13 +31,14 @@ const quantityText = (value: number) => new Intl.NumberFormat('en-IN', { maximum
 /** Locks and draws one line's goods; returns the draws to store under the line. */
 export async function drawStock(tx: Tx, request: StockOutRequest): Promise<StockDraw[]> {
   const { itemId, godownId, date } = request;
-  const [opening] = await tx.$queryRaw<{ quantity: unknown; value: unknown; drawn: unknown }[]>`
-    SELECT "quantity", "value", "drawn" FROM "ItemOpeningStock"
-    WHERE "itemId" = ${itemId}::uuid AND "godownId" = ${godownId}::uuid FOR UPDATE`;
-  const batches = await tx.$queryRaw<{ id: string; remaining: unknown; landedRate: unknown }[]>`
-    SELECT "id", "remaining", "landedRate" FROM "StockBatch"
-    WHERE "itemId" = ${itemId}::uuid AND "godownId" = ${godownId}::uuid AND "remaining" > 0 AND "date" <= ${date}::date
-    ORDER BY "date", "createdAt", "id" FOR UPDATE`;
+  await lockItemInGodown(tx, 'ItemOpeningStock', itemId, godownId);
+  const opening = await tx.itemOpeningStock.findFirst({ where: { itemId, godownId }, select: { quantity: true, value: true, drawn: true } });
+  await lockItemInGodown(tx, 'StockBatch', itemId, godownId);
+  const batches = await tx.stockBatch.findMany({
+    where: { itemId, godownId, remaining: { gt: 0 }, date: { lte: dateOnly(date) } },
+    orderBy: [{ date: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+    select: { id: true, remaining: true, landedRate: true },
+  });
 
   const slices: StockSlice[] = [];
   if (opening) {
@@ -57,10 +59,9 @@ export async function drawStock(tx: Tx, request: StockOutRequest): Promise<Stock
   }
   for (const draw of plan.draws) {
     if (draw.batchId) {
-      await tx.$executeRaw`UPDATE "StockBatch" SET "remaining" = "remaining" - ${draw.quantity}::numeric WHERE "id" = ${draw.batchId}::uuid`;
+      await tx.stockBatch.update({ where: { id: draw.batchId }, data: { remaining: { decrement: draw.quantity } } });
     } else {
-      await tx.$executeRaw`UPDATE "ItemOpeningStock" SET "drawn" = "drawn" + ${draw.quantity}::numeric
-        WHERE "itemId" = ${itemId}::uuid AND "godownId" = ${godownId}::uuid`;
+      await tx.itemOpeningStock.updateMany({ where: { itemId, godownId }, data: { drawn: { increment: draw.quantity } } });
     }
   }
   return plan.draws;
@@ -78,10 +79,9 @@ export interface DrawToReturn {
 export async function putBack(tx: Tx, draws: DrawToReturn[]): Promise<void> {
   for (const draw of draws) {
     if (draw.batchId) {
-      await tx.$executeRaw`UPDATE "StockBatch" SET "remaining" = "remaining" + ${draw.quantity} WHERE "id" = ${draw.batchId}::uuid`;
+      await tx.stockBatch.update({ where: { id: draw.batchId }, data: { remaining: { increment: draw.quantity } } });
     } else {
-      await tx.$executeRaw`UPDATE "ItemOpeningStock" SET "drawn" = "drawn" - ${draw.quantity}
-        WHERE "itemId" = ${draw.itemId}::uuid AND "godownId" = ${draw.godownId}::uuid`;
+      await tx.itemOpeningStock.updateMany({ where: { itemId: draw.itemId, godownId: draw.godownId }, data: { drawn: { decrement: draw.quantity } } });
     }
   }
 }

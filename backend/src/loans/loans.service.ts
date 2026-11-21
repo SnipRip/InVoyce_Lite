@@ -27,6 +27,7 @@ import {
   type LoanReminderView,
   type LoanView,
 } from './loan-view.js';
+import { lockRows } from '../database/sql.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -72,7 +73,7 @@ async function assertLiveAccount(tx: Tx, id: string, label: string) {
 // The head is locked until the loan is saved, so it cannot be archived or
 // moved to the other side in between (AccountHeadsService locks it too).
 async function assertInterestHead(tx: Tx, direction: LoanFields['direction'], id: string) {
-  await tx.$queryRaw`SELECT 1 FROM "AccountHead" WHERE "id" = ${id}::uuid FOR SHARE`;
+  await lockRows(tx, 'AccountHead', id, 'share');
   const problem = interestHeadProblem(direction, await tx.accountHead.findUnique({ where: { id } }));
   if (problem) throw new BadRequestException(problem);
 }
@@ -80,7 +81,7 @@ async function assertInterestHead(tx: Tx, direction: LoanFields['direction'], id
 // A general ledger the loan posts to: live and under the right group. Locked
 // like the interest head, so it cannot be archived while the loan saves.
 async function assertLinkedLedger(tx: Tx, use: 'asset' | 'tds', direction: LoanFields['direction'], id: string) {
-  await tx.$queryRaw`SELECT 1 FROM "Ledger" WHERE "id" = ${id}::uuid FOR SHARE`;
+  await lockRows(tx, 'Ledger', id, 'share');
   const ledger = await tx.ledger.findUnique({ where: { id } });
   const groups = groupMap(await tx.ledgerGroup.findMany());
   const path = ledger?.groupId ? placeOf(groups, ledger.groupId).path : [];
@@ -208,7 +209,7 @@ export class LoansService {
    */
   recordEntry(loanId: string, dto: RecordLoanEntryDto): Promise<LoanDetailView> {
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT 1 FROM "Loan" WHERE "id" = ${loanId}::uuid FOR UPDATE`;
+      await lockRows(tx, 'Loan', loanId);
       const loan = await tx.loan.findUniqueOrThrow({ where: { id: loanId }, include: LOAN_INCLUDE });
       const fields = loanFields(loan);
       if (fields.isArchived) throw new BadRequestException('Restore the loan before recording an entry');

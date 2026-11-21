@@ -1,6 +1,7 @@
 // Stock out and batch locks both stock-move services share, inside their
 // transactions.
 import { ConflictException } from '@nestjs/common';
+import { lockRows } from '../database/sql.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import type { ItemDocumentFacts } from '../items/item-document-facts.js';
 import type { StockDraw } from '../stock/fifo-rules.js';
@@ -46,9 +47,10 @@ export async function drawLines(tx: Tx, request: DrawLinesRequest): Promise<Stoc
  * since: that stock has been sold or moved on, so the document cannot be
  * undone. Returns their ids for deleting.
  */
-export async function lockUntouchedBatches(tx: Tx, where: Prisma.Sql, refusal: string): Promise<string[]> {
-  const batches = await tx.$queryRaw<{ id: string; untouched: boolean }[]>`
-    SELECT "id", "remaining" = "quantity" AS "untouched" FROM "StockBatch" WHERE ${where} ORDER BY "id" FOR UPDATE`;
-  if (batches.some((batch) => !batch.untouched)) throw new ConflictException(refusal);
-  return batches.map((batch) => batch.id);
+export async function lockUntouchedBatches(tx: Tx, where: Prisma.StockBatchWhereInput, refusal: string): Promise<string[]> {
+  const ids = (await tx.stockBatch.findMany({ where, select: { id: true } })).map((batch) => batch.id);
+  await lockRows(tx, 'StockBatch', ids);
+  const batches = await tx.stockBatch.findMany({ where: { id: { in: ids } }, select: { remaining: true, quantity: true } });
+  if (batches.some((batch) => !batch.remaining.equals(batch.quantity))) throw new ConflictException(refusal);
+  return ids;
 }

@@ -12,7 +12,7 @@ import {
 } from '../common/dates.js';
 import { definedFields } from '../common/dto/defined-fields.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { NumberFormat, Prisma } from '../generated/prisma/client.js';
+import { Prisma, type NumberFormat } from '../generated/prisma/client.js';
 import type { NumberedKind, NumberReset } from '../generated/prisma/enums.js';
 import type { CreateNumberFormatDto } from './dto/create-number-format.dto.js';
 import type { UpdateNumberFormatDto } from './dto/update-number-format.dto.js';
@@ -35,6 +35,7 @@ import {
   type NumberSeriesView,
 } from './number-series-view.js';
 import { KIND_ORDER, KIND_RULES } from './numbered-kinds.js';
+import { isMysql, lockRows } from '../database/sql.js';
 
 type Tx = Prisma.TransactionClient;
 type FormatFields = Pick<
@@ -134,21 +135,35 @@ export class NumberSeriesService {
   // how many numbers, how many cancelled, the first and the last.
   private async summaries(date: string): Promise<Map<string, IssuedSummary>> {
     const year = uniqueWithinOf('SALES_INVOICE', date);
-    const rows = await this.prisma.$queryRaw<
-      (IssuedSummary & { kind: NumberedKind })[]
-    >`
-      SELECT "kind", "uniqueWithin" AS "period",
-        count(*)::int AS "total",
-        (count(*) FILTER (WHERE "status" = 'CANCELLED'))::int AS "cancelled",
-        (array_agg("number" ORDER BY "createdAt", "sequence"))[1] AS "first",
-        (array_agg("number" ORDER BY "createdAt" DESC, "sequence" DESC))[1] AS "last"
-      FROM "IssuedNumber"
-      WHERE "uniqueWithin" IN (${year}, 'ALL')
-      GROUP BY "kind", "uniqueWithin"`;
+    type Row = Omit<IssuedSummary, 'total' | 'cancelled'> & {
+      kind: NumberedKind;
+      total: unknown;
+      cancelled: unknown;
+    };
+    // Numbers are [A-Z0-9/-] only, so a space safely separates them in GROUP_CONCAT.
+    const rows = isMysql()
+      ? await this.prisma.$queryRaw<Row[]>`
+          SELECT \`kind\`, \`uniqueWithin\` AS \`period\`,
+            COUNT(*) AS \`total\`,
+            SUM(\`status\` = 'CANCELLED') AS \`cancelled\`,
+            SUBSTRING_INDEX(GROUP_CONCAT(\`number\` ORDER BY \`createdAt\`, \`sequence\` SEPARATOR ' '), ' ', 1) AS \`first\`,
+            SUBSTRING_INDEX(GROUP_CONCAT(\`number\` ORDER BY \`createdAt\` DESC, \`sequence\` DESC SEPARATOR ' '), ' ', 1) AS \`last\`
+          FROM \`IssuedNumber\`
+          WHERE \`uniqueWithin\` IN (${year}, 'ALL')
+          GROUP BY \`kind\`, \`uniqueWithin\``
+      : await this.prisma.$queryRaw<Row[]>`
+          SELECT "kind", "uniqueWithin" AS "period",
+            count(*)::int AS "total",
+            (count(*) FILTER (WHERE "status" = 'CANCELLED'))::int AS "cancelled",
+            (array_agg("number" ORDER BY "createdAt", "sequence"))[1] AS "first",
+            (array_agg("number" ORDER BY "createdAt" DESC, "sequence" DESC))[1] AS "last"
+          FROM "IssuedNumber"
+          WHERE "uniqueWithin" IN (${year}, 'ALL')
+          GROUP BY "kind", "uniqueWithin"`;
     return new Map(
-      rows.map(({ kind, ...summary }) => [
+      rows.map(({ kind, total, cancelled, ...summary }) => [
         `${kind} ${summary.period}`,
-        summary,
+        { ...summary, total: Number(total), cancelled: Number(cancelled ?? 0) },
       ]),
     );
   }
@@ -279,23 +294,62 @@ export class NumberSeriesService {
   ): Promise<ClaimedNumber> {
     const rules = KIND_RULES[kind];
     // Shared: claims run side by side, but wait for a format change (lockSeries).
-    await tx.$queryRaw`SELECT 1 FROM "NumberSeries" WHERE "kind" = ${kind}::"NumberedKind" FOR SHARE`;
+    const { id: seriesId } = await tx.numberSeries.findUniqueOrThrow({ where: { kind }, select: { id: true } });
+    await lockRows(tx, 'NumberSeries', seriesId, 'share');
     const series = await tx.numberSeries.findUniqueOrThrow({
       where: { kind },
       include: { formats: true },
     });
     const typed = options.typed?.trim().toUpperCase();
-    const record = (
+    const uniqueWithin = uniqueWithinOf(kind, date);
+    // Records the number; [] when it is already taken in its scope and year.
+    const record = async (
       number: string,
       formatId: string | null,
       sequence: number | null,
-    ) =>
-      tx.$queryRaw<{ id: string }[]>`
-        INSERT INTO "IssuedNumber" ("id", "kind", "scope", "uniqueWithin", "number", "formatId", "sequence", "documentDate", "documentId")
-        VALUES (gen_random_uuid(), ${kind}::"NumberedKind", ${rules.scope}, ${uniqueWithinOf(kind, date)}, ${number},
-          ${formatId}::uuid, ${sequence}, ${date}::date, ${options.documentId ?? null}::uuid)
-        ON CONFLICT ("scope", "uniqueWithin", "number") DO NOTHING
-        RETURNING "id"`;
+    ): Promise<{ id: string }[]> => {
+      if (!isMysql()) {
+        return tx.$queryRaw<{ id: string }[]>`
+          INSERT INTO "IssuedNumber" ("id", "kind", "scope", "uniqueWithin", "number", "formatId", "sequence", "documentDate", "documentId")
+          VALUES (gen_random_uuid(), ${kind}::"NumberedKind", ${rules.scope}, ${uniqueWithin}, ${number},
+            ${formatId}::uuid, ${sequence}, ${date}::date, ${options.documentId ?? null}::uuid)
+          ON CONFLICT ("scope", "uniqueWithin", "number") DO NOTHING
+          RETURNING "id"`;
+      }
+      // MySQL rolls back only the failed statement on a duplicate key, so
+      // the transaction carries on, as ON CONFLICT DO NOTHING does.
+      try {
+        const row = await tx.issuedNumber.create({
+          data: { kind, scope: rules.scope, uniqueWithin, number, formatId, sequence, documentDate: dateOnly(date), documentId: options.documentId ?? null },
+          select: { id: true },
+        });
+        return [row];
+      } catch (error) {
+        const taken =
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002' &&
+          (await tx.issuedNumber.count({ where: { scope: rules.scope, uniqueWithin, number } })) > 0;
+        if (taken) return [];
+        throw error;
+      }
+    };
+    const nextSequence = async (formatId: string, period: string, first: number): Promise<number> => {
+      if (!isMysql()) {
+        const [{ sequence }] = await tx.$queryRaw<{ sequence: number }[]>`
+          INSERT INTO "NumberCounter" ("formatId", "period", "nextNumber")
+          VALUES (${formatId}::uuid, ${period}, ${first + 1})
+          ON CONFLICT ("formatId", "period") DO UPDATE SET "nextNumber" = "NumberCounter"."nextNumber" + 1
+          RETURNING "nextNumber" - 1 AS "sequence"`;
+        return sequence;
+      }
+      // The upsert leaves the counter row locked by this transaction until it ends.
+      await tx.$executeRaw`
+        INSERT INTO \`NumberCounter\` (\`formatId\`, \`period\`, \`nextNumber\`)
+        VALUES (${formatId}, ${period}, ${first + 1})
+        ON DUPLICATE KEY UPDATE \`nextNumber\` = \`nextNumber\` + 1`;
+      const counter = await tx.numberCounter.findUniqueOrThrow({ where: { formatId_period: { formatId, period } }, select: { nextNumber: true } });
+      return counter.nextNumber - 1;
+    };
 
     if (typed !== undefined) {
       if (series.method === 'AUTOMATIC') {
@@ -325,11 +379,7 @@ export class NumberSeriesService {
     const parts = partsOf(format.pattern);
     const period = periodOf(format.reset, date);
     for (let skips = 0; skips < MAX_SKIPS; skips++) {
-      const [{ sequence }] = await tx.$queryRaw<{ sequence: number }[]>`
-        INSERT INTO "NumberCounter" ("formatId", "period", "nextNumber")
-        VALUES (${format.id}::uuid, ${period}, ${firstNumberOf(format, period) + 1})
-        ON CONFLICT ("formatId", "period") DO UPDATE SET "nextNumber" = "NumberCounter"."nextNumber" + 1
-        RETURNING "nextNumber" - 1 AS "sequence"`;
+      const sequence = await nextSequence(format.id, period, firstNumberOf(format, period));
       const number = renderNumber(parts, date, sequence);
       const problem = numberProblem(kind, number);
       if (problem)
@@ -367,8 +417,8 @@ export class NumberSeriesService {
   // change locks the series row for update, a claim for share. Claims then
   // queue on their counter row.
   private async lockSeries(tx: Tx, id: string) {
-    const [series] = await tx.$queryRaw<{ kind: NumberedKind }[]>`
-      SELECT "kind" FROM "NumberSeries" WHERE "id" = ${id}::uuid FOR UPDATE`;
+    await lockRows(tx, 'NumberSeries', id);
+    const series = (await tx.numberSeries.findUnique({ where: { id }, select: { kind: true } }))!;
     if (!series) throw new NotFoundException('Record not found');
     return series;
   }

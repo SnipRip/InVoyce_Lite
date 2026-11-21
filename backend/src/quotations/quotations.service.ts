@@ -9,6 +9,7 @@ import { SalePricingService } from '../sale-pricing/sale-pricing.service.js';
 import { saleRegime } from '../sale-pricing/sale-rules.js';
 import type { QuotationDto, ReviseQuotationDto } from './dto/quotation.dto.js';
 import { quotationInclude, toQuotationView, type QuotationView } from './quotation-views.js';
+import { lockRows } from '../database/sql.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -65,8 +66,8 @@ export class QuotationsService {
   /** A new revision: same number, new lines; the old total is kept with the note. */
   revise(id: string, dto: ReviseQuotationDto): Promise<QuotationView> {
     return this.prisma.$transaction(async (tx) => {
-      const [current] = await tx.$queryRaw<{ status: QuotationStatus; revision: number; date: Date; total: Prisma.Decimal; partyId: string }[]>`
-        SELECT "status", "revision", "date", "total", "partyId" FROM "Quotation" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      await lockRows(tx, 'Quotation', id);
+      const current = (await tx.quotation.findUnique({ where: { id }, select: { status: true, revision: true, date: true, total: true, partyId: true } }))!;
       if (!current) throw new BadRequestException('That quotation does not exist');
       if (current.status === 'ACCEPTED' || current.status === 'CANCELLED' || current.status === 'CONVERTED') {
         throw new ConflictException(`An ${current.status.toLowerCase()} quotation is not revised. Make a new one.`);
@@ -90,8 +91,8 @@ export class QuotationsService {
 
   setStatus(id: string, status: QuotationStatus): Promise<QuotationView> {
     return this.prisma.$transaction(async (tx) => {
-      const [current] = await tx.$queryRaw<{ status: QuotationStatus; issuedNumberId: string | null }[]>`
-        SELECT "status", "issuedNumberId" FROM "Quotation" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      await lockRows(tx, 'Quotation', id);
+      const current = (await tx.quotation.findUnique({ where: { id }, select: { status: true, issuedNumberId: true } }))!;
       if (!current) throw new BadRequestException('That quotation does not exist');
       if (!NEXT[current.status].includes(status)) {
         throw new ConflictException(`A ${current.status.toLowerCase()} quotation cannot be marked ${status.toLowerCase()}`);

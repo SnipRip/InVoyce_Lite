@@ -3,6 +3,7 @@
 // renamed or archived under the save) and its master number is recorded.
 import { BadRequestException } from '@nestjs/common';
 import type { Prisma } from '../generated/prisma/client.js';
+import { lockRows } from '../database/sql.js';
 
 /**
  * The number to store. An archived vehicle is refused unless the document
@@ -15,8 +16,8 @@ export async function pickedVehicleNumber<T extends string | null>(
   currentVehicleId: string | null = null,
 ): Promise<string | T> {
   if (!vehicleId) return typedNumber;
-  const [vehicle] = await tx.$queryRaw<{ number: string; isArchived: boolean }[]>`
-    SELECT "number", "isArchived" FROM "Vehicle" WHERE "id" = ${vehicleId}::uuid FOR SHARE`;
+  await lockRows(tx, 'Vehicle', vehicleId, 'share');
+  const vehicle = await tx.vehicle.findUnique({ where: { id: vehicleId }, select: { number: true, isArchived: true } });
   if (!vehicle) throw new BadRequestException('That vehicle is not in the vehicle master');
   if (vehicle.isArchived && vehicleId !== currentVehicleId) throw new BadRequestException('This vehicle is archived');
   return vehicle.number;

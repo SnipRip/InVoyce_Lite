@@ -11,16 +11,8 @@ import { cashLimitProblem } from '../settlements/settlement-rules.js';
 import { cashReceivedOn } from './journal-cash.js';
 import { cashByParty, journalProblem, partySideOf, settlesOutstanding, totalsOf, type JournalLineInput, type PartySide } from './journal-rules.js';
 
-interface PartyRow {
-  id: string;
-  displayName: string;
-  isCustomer: boolean;
-  isVendor: boolean;
-  isArchived: boolean;
-  openingBalance: Prisma.Decimal;
-  openingBalanceSide: 'RECEIVABLE' | 'PAYABLE';
-}
 import { journalInclude, toJournalView, type JournalView } from './journal-views.js';
+import { lockRows } from '../database/sql.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -86,9 +78,12 @@ export class JournalsService {
       // Parties first, in id order: the lock order receipts and payments use (party, then documents).
       const partyIds = [...new Set(dto.lines.filter((line) => line.kind === 'party').map((line) => line.id))].sort();
       const parties = partyIds.length
-        ? await tx.$queryRaw<PartyRow[]>`
-            SELECT "id", "displayName", "isCustomer", "isVendor", "isArchived", "openingBalance", "openingBalanceSide"
-            FROM "Party" WHERE "id" = ANY(${partyIds}::uuid[]) ORDER BY "id" FOR UPDATE`
+        ? ((await lockRows(tx, 'Party', partyIds)),
+          await tx.party.findMany({
+            where: { id: { in: partyIds } },
+            orderBy: { id: 'asc' },
+            select: { id: true, displayName: true, isCustomer: true, isVendor: true, isArchived: true, openingBalance: true, openingBalanceSide: true },
+          }))
         : [];
       const sides = dto.lines.map((line, index) => {
         if (line.kind !== 'party') {
@@ -172,8 +167,8 @@ export class JournalsService {
   /** The voucher stops counting in the books; its number is cancelled, never given again. Credit its lines applied stops counting too. */
   cancel(id: string, reason: string): Promise<JournalView> {
     return this.prisma.$transaction(async (tx) => {
-      const [current] = await tx.$queryRaw<{ cancelledAt: Date | null; issuedNumberId: string }[]>`
-        SELECT "cancelledAt", "issuedNumberId" FROM "JournalVoucher" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      await lockRows(tx, 'JournalVoucher', id);
+      const current = (await tx.journalVoucher.findUnique({ where: { id }, select: { cancelledAt: true, issuedNumberId: true } }))!;
       if (!current) fail('That journal does not exist');
       if (current.cancelledAt) throw new ConflictException('This journal is already cancelled');
       // A charge on a party that money or credit has since settled stays until those are cancelled.

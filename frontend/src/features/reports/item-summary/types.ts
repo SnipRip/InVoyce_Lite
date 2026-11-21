@@ -81,7 +81,6 @@ export interface ItemSummaryView {
     hsn: string;
     mrp: number | null;
     reorderLevel: number;
-    pictureId: string | null;
     isArchived: boolean;
   };
   stock: {

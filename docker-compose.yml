@@ -20,5 +20,27 @@ services:
       timeout: 3s
       retries: 10
 
+  # Only for trying the MySQL / MariaDB build: `docker compose --profile mysql up -d`.
+  mariadb:
+    image: mariadb:11.4
+    profiles: ["mysql"]
+    restart: unless-stopped
+    environment:
+      MARIADB_USER: ivl
+      MARIADB_PASSWORD: ivl_local_dev
+      MARIADB_DATABASE: invoyce_lite
+      MARIADB_RANDOM_ROOT_PASSWORD: "1"
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 volumes:
   postgres_data:
+  mariadb_data:

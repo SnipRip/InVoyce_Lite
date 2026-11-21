@@ -1,8 +1,6 @@
 import { Module } from '@nestjs/common';
 import { NumberSeriesModule } from '../number-series/number-series.module.js';
 import { SalePricingModule } from '../sale-pricing/sale-pricing.module.js';
-import { InvoiceDocumentFilesController } from './invoice-document-files.controller.js';
-import { InvoiceDocumentFilesService } from './invoice-document-files.service.js';
 import { InvoiceDocumentsService } from './invoice-documents.service.js';
 import { InvoicesController } from './invoices.controller.js';
 import { InvoicesService } from './invoices.service.js';
@@ -12,7 +10,7 @@ import { InvoicesService } from './invoices.service.js';
 // dispatch documents that follow them (invoice-documents.service.ts).
 @Module({
   imports: [NumberSeriesModule, SalePricingModule],
-  controllers: [InvoicesController, InvoiceDocumentFilesController],
-  providers: [InvoicesService, InvoiceDocumentsService, InvoiceDocumentFilesService],
+  controllers: [InvoicesController],
+  providers: [InvoicesService, InvoiceDocumentsService],
 })
 export class InvoicesModule {}

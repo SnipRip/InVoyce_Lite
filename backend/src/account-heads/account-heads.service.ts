@@ -8,6 +8,7 @@ import { toAccountHeadView, type AccountHeadView } from './account-head-view.js'
 import { headProblem, isExpense, LOAN_LEDGERS, settleHead } from './account-head-rules.js';
 import type { CreateAccountHeadDto } from './dto/create-account-head.dto.js';
 import type { UpdateAccountHeadDto } from './dto/update-account-head.dto.js';
+import { lockRows } from '../database/sql.js';
 
 type HeadFields = Omit<AccountHeadView, 'id' | 'accountGroup'>;
 
@@ -37,7 +38,7 @@ async function postedByLoans(tx: Prisma.TransactionClient, head: { id: string; n
 // Locks the head so a loan saving at the same moment either sees the change
 // or is seen by postedByLoans (LoansService locks it FOR SHARE).
 async function lockHead(tx: Prisma.TransactionClient, id: string) {
-  await tx.$queryRaw`SELECT 1 FROM "AccountHead" WHERE "id" = ${id}::uuid FOR UPDATE`;
+  await lockRows(tx, 'AccountHead', id);
   return tx.accountHead.findUniqueOrThrow({ where: { id } });
 }
 

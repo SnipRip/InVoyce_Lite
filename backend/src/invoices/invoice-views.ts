@@ -25,8 +25,6 @@ export const invoiceInclude = {
       date: true,
       details: true,
       updatedAt: true,
-      // The scans kept with it (never the bytes here).
-      files: { orderBy: { createdAt: 'asc' }, select: { id: true, name: true, contentType: true, size: true } },
     },
   },
   // Live receipts applied to it (src/settlements).
@@ -123,7 +121,6 @@ export const toInvoiceView = (invoice: InvoiceRow) => ({
       date: isoDate(document.date),
       details: document.details as DocumentDetails,
       updatedAt: document.updatedAt,
-      files: document.files,
     }))
     .sort((a, b) => DOCUMENT_ORDER.indexOf(a.kind) - DOCUMENT_ORDER.indexOf(b.kind)),
   cancelledAt: invoice.cancelledAt,

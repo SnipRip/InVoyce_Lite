@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Paperclip, Wallet } from "lucide-react";
+import { Ban, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Button, buttonClasses } from "@/components/ui/button";
@@ -316,16 +316,7 @@ export function BillDetail({ bill, bills, parties, items, company, onChanged }: 
 
         <GlassCard className="flex flex-col gap-2">
           <CardTitle>Vendor&rsquo;s bill</CardTitle>
-          {bill.fileName ? (
-            <p className="flex items-center gap-2 text-sm font-semibold">
-              <Paperclip aria-hidden="true" className="size-4 text-muted" />
-              {bill.fileName}
-            </p>
-          ) : (
-            <p className="text-sm font-semibold text-muted">No scan attached.</p>
-          )}
-          {bill.notes && <p className="text-xs font-semibold text-ink-soft">{bill.notes}</p>}
-          <p className="text-xs font-semibold text-muted">Uploading scans switches on when file storage is chosen.</p>
+          {bill.notes ? <p className="text-sm font-semibold text-ink-soft">{bill.notes}</p> : <p className="text-sm font-semibold text-muted">No notes.</p>}
         </GlassCard>
 
         {bill.status === "open" && (

@@ -1,7 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { dateOnly, isoDate, todayInIndia } from '../common/dates.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { DispatchDocumentKind, GstTreatment, InvoiceStatus, Prisma } from '../generated/prisma/client.js';
+import { lockRows } from '../database/sql.js';
+import type { DispatchDocumentKind, Prisma } from '../generated/prisma/client.js';
 import { cleanDetails, cleanNumber, documentDateProblem, documentKindProblem, nameInText } from './dispatch-document-rules.js';
 import type { InvoiceDocumentDto } from './dto/invoice.dto.js';
 import { invoiceInclude, toInvoiceView, type InvoiceView } from './invoice-views.js';
@@ -61,11 +62,10 @@ export class InvoiceDocumentsService {
   }
 
   private async lockIssued(tx: Tx, invoiceId: string) {
-    const [invoice] = await tx.$queryRaw<{ status: InvoiceStatus; date: Date; treatment: GstTreatment }[]>`
-      SELECT i."status", i."date", p."treatment"
-      FROM "Invoice" i JOIN "Party" p ON p."id" = i."partyId"
-      WHERE i."id" = ${invoiceId}::uuid FOR UPDATE OF i`;
-    if (!invoice) throw new NotFoundException('That invoice does not exist');
+    await lockRows(tx, 'Invoice', invoiceId);
+    const found = await tx.invoice.findUnique({ where: { id: invoiceId }, select: { status: true, date: true, party: { select: { treatment: true } } } });
+    if (!found) throw new NotFoundException('That invoice does not exist');
+    const invoice = { status: found.status, date: found.date, treatment: found.party.treatment };
     if (invoice.status !== 'ISSUED') throw new ConflictException('This invoice is cancelled; its documents can no longer change');
     return invoice;
   }

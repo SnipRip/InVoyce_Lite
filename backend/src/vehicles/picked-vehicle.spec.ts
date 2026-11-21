@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { Prisma } from '../generated/prisma/client.js';
 import { pickedVehicleNumber } from './picked-vehicle.js';
 
-/** A transaction whose FOR SHARE read returns these rows. */
+/** A transaction where the vehicle master holds these rows (the lock, then the read). */
 const txReturning = (rows: { number: string; isArchived: boolean }[]) =>
-  ({ $queryRaw: () => Promise.resolve(rows) }) as unknown as Prisma.TransactionClient;
+  ({
+    $queryRaw: () => Promise.resolve(rows.map(() => ({ 1: 1 }))),
+    vehicle: { findUnique: () => Promise.resolve(rows[0] ?? null) },
+  }) as unknown as Prisma.TransactionClient;
 
 const ID = '6f1c2b1e-0000-4000-8000-000000000001';
 

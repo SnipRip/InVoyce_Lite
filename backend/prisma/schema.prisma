@@ -68,7 +68,6 @@ model User {
   journalsMade         JournalVoucher[]      @relation("JournalCreatedBy")
   creditNotesMade      CreditNote[]          @relation("CreditNoteCreatedBy")
   challansMade         DeliveryChallan[]     @relation("DeliveryChallanCreatedBy")
-  documentFilesSaved   InvoiceDocumentFile[] @relation("InvoiceDocumentFileBy")
   debitNotesMade       DebitNote[]           @relation("DebitNoteCreatedBy")
 
   @@index([accessRoleId])
@@ -289,10 +288,6 @@ model Item {
   openingStock     ItemOpeningStock[]
   specialRates     SpecialRate[]
   priceList        ItemPrice[]
-  pictures         ItemPicture[]        @relation("ItemPictures")
-  // The picture shown for the item everywhere (client, 12 Nov 2026); null: the first one.
-  primaryPictureId String?              @unique @db.Uuid
-  primaryPicture   ItemPicture?         @relation("ItemPrimaryPicture", fields: [primaryPictureId], references: [id], onDelete: SetNull)
 
   schemeTargets      SchemeTarget[]
   purchaseOrderLines PurchaseOrderLine[]
@@ -311,27 +306,6 @@ model Item {
   @@index([categoryId])
   @@index([subCategoryId])
   @@index([groupId])
-}
-
-// An item's pictures (up to 10, for sending to clients), kept in the
-// database rather than on disk: they go into the same backup as the item,
-// leave with it (cascade) in the same transaction, and need no upload folder
-// kept across deploys on the shared server. At 1 MB each (CHECK in migration
-// 20261104032204_item_pictures) a few thousand items stay well within what
-// Postgres handles. A separate table so item lists never read the bytes.
-// A picture is never replaced, only added or removed, so its id alone makes
-// a URL the browser can cache for good. The oldest is the item's cover.
-model ItemPicture {
-  id          String   @id @default(uuid()) @db.Uuid
-  itemId      String   @db.Uuid
-  item        Item     @relation("ItemPictures", fields: [itemId], references: [id], onDelete: Cascade)
-  primaryOf   Item?    @relation("ItemPrimaryPicture")
-  // Worked out from the file's first bytes, never taken from the upload.
-  contentType String
-  bytes       Bytes
-  createdAt   DateTime @default(now())
-
-  @@index([itemId, createdAt])
 }
 
 // "1 bundle = 25 kg": an alternate unit and how many base units one of it holds.
@@ -1398,7 +1372,9 @@ model Scheme {
   // LINE: the line's value; ORDER: the eligible lines' value. Before GST.
   minValue    Decimal?           @db.Decimal(14, 2)
   partyScope  SchemePartyScope   @default(ALL)
-  rateSources SchemeRateSource[]
+  // The SchemeRateSource values it applies on, as a JSON array ["SHEET", …]
+  // (MySQL has no array columns). Read through toSchemeView.
+  rateSources Json
   // Not stackable: only the best such scheme applies. Stackable ones add on.
   stackable   Boolean            @default(false)
   validFrom   DateTime           @db.Date
@@ -1954,29 +1930,9 @@ model InvoiceDocument {
   createdAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
 
-  files InvoiceDocumentFile[]
 
   @@unique([invoiceId, kind])
   @@index([kind, number])
-}
-
-// A scan or PDF of a dispatch document: the e-way bill, lorry challan or
-// e-invoice, kept with the paper it proves. The
-// type is read from the file's first bytes; size and count are capped
-// (document-file-rules.ts, and the CHECK).
-model InvoiceDocumentFile {
-  id           String          @id @default(uuid()) @db.Uuid
-  documentId   String          @db.Uuid
-  document     InvoiceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  name         String
-  contentType  String
-  size         Int
-  bytes        Bytes
-  uploadedById String?         @db.Uuid
-  uploadedBy   User?           @relation("InvoiceDocumentFileBy", fields: [uploadedById], references: [id], onDelete: SetNull)
-  createdAt    DateTime        @default(now())
-
-  @@index([documentId, createdAt])
 }
 
 model InvoiceLine {

@@ -3,7 +3,7 @@
 // brochure (agent/masters-plan.md). Run with `npm run db:seed`. Safe to
 // re-run: existing rows are left as they are, so edits made in the app stay.
 import 'dotenv/config';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { prismaClientOptions } from '../src/database/client-options.js';
 import { PrismaClient, type UnitKind } from '../src/generated/prisma/client.js';
 import { hashPassword } from '../src/auth/password-hashing.js';
 import {
@@ -87,9 +87,7 @@ const CATEGORIES: [string, string[]][] = [
   ['Paints', []],
 ];
 
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
-});
+const prisma = new PrismaClient(prismaClientOptions(process.env.DATABASE_URL ?? ''));
 
 try {
   const existing = await prisma.user.findUnique({ where: { email } });

@@ -16,8 +16,6 @@ export interface RateEnquiryItemView {
   stock: number;
   /** 0 = no reorder level set. */
   reorderLevel: number;
-  /** The item's primary picture (else its first); null without one. */
-  pictureId: string | null;
   options: LineRateOptionsView;
 }
 

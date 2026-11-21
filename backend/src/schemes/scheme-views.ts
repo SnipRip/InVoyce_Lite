@@ -2,7 +2,7 @@
 // YYYY-MM-DD. The view is also the facts scheme-rules.ts reads.
 import { isoDate } from '../common/dates.js';
 import { toNumber } from '../common/decimal.js';
-import type { Prisma } from '../generated/prisma/client.js';
+import type { Prisma, SchemeRateSource } from '../generated/prisma/client.js';
 import type { SchemeFacts } from './scheme-rules.js';
 
 export interface SchemeView extends SchemeFacts {
@@ -33,7 +33,7 @@ export const toSchemeView = (row: SchemeRow): SchemeView => ({
   partyScope: row.partyScope,
   partyIds: row.parties.map((party) => party.partyId),
   targets: row.targets,
-  rateSources: row.rateSources,
+  rateSources: row.rateSources as SchemeRateSource[],
   stackable: row.stackable,
   validFrom: isoDate(row.validFrom),
   validTill: row.validTill ? isoDate(row.validTill) : null,

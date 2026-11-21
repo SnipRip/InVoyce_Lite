@@ -1,7 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { dateOnly } from '../common/dates.js';
 import { PrismaService } from '../database/prisma.service.js';
-import { Prisma } from '../generated/prisma/client.js';
 import { loadItemFacts } from '../items/item-document-facts.js';
 import { NumberSeriesService } from '../number-series/number-series.service.js';
 import { liveGodown } from '../purchases/purchase-context.js';
@@ -12,6 +11,7 @@ import type { StockTransferDto } from './dto/stock-move.dto.js';
 import { drawLines, lockUntouchedBatches } from './stock-move-draws.js';
 import { repeatedItem, transferProblem } from './stock-move-rules.js';
 import { toTransferView, transferInclude, type StockTransferView } from './stock-move-views.js';
+import { lockRows } from '../database/sql.js';
 
 const money = (value: number) => Math.round(value * 100) / 100;
 const fail = (message: string | null) => {
@@ -107,8 +107,8 @@ export class StockTransfersService {
   /** Takes the stock back out of the destination and returns it to the source; the number is cancelled. */
   cancel(id: string, reason: string): Promise<StockTransferView> {
     return this.prisma.$transaction(async (tx) => {
-      const [current] = await tx.$queryRaw<{ status: string; issuedNumberId: string; fromGodownId: string }[]>`
-        SELECT "status", "issuedNumberId", "fromGodownId" FROM "StockTransfer" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      await lockRows(tx, 'StockTransfer', id);
+      const current = (await tx.stockTransfer.findUnique({ where: { id }, select: { status: true, issuedNumberId: true, fromGodownId: true } }))!;
       if (!current) fail('That transfer does not exist');
       if (current.status === 'CANCELLED') throw new ConflictException('This transfer is already cancelled');
 
@@ -119,7 +119,7 @@ export class StockTransfersService {
       });
       const batchIds = await lockUntouchedBatches(
         tx,
-        Prisma.sql`"transferLineId" IN (${Prisma.join(lines.map((line) => Prisma.sql`${line.id}::uuid`))})`,
+        { transferLineId: { in: lines.map((line) => line.id) } },
         'Some of the moved stock has already been sold or moved on from the other godown, so this transfer cannot be cancelled',
       );
       await tx.stockBatch.deleteMany({ where: { id: { in: batchIds } } });

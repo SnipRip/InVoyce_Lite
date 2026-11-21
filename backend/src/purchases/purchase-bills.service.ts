@@ -23,6 +23,7 @@ import {
   type BillLineInput,
 } from './purchase-rules.js';
 import { billInclude, toBillView, type PurchaseBillView } from './purchase-views.js';
+import { lockRows } from '../database/sql.js';
 
 type Db = Prisma.TransactionClient;
 
@@ -244,8 +245,8 @@ export class PurchaseBillsService {
    */
   void(id: string): Promise<PurchaseBillView> {
     return this.prisma.$transaction(async (tx) => {
-      const [bill] = await tx.$queryRaw<{ kind: string; status: string; landedCostForId: string | null; issuedNumberId: string | null }[]>`
-        SELECT "kind", "status", "landedCostForId", "issuedNumberId" FROM "PurchaseBill" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      await lockRows(tx, 'PurchaseBill', id);
+      const bill = (await tx.purchaseBill.findUnique({ where: { id }, select: { kind: true, status: true, landedCostForId: true, issuedNumberId: true } }))!;
       if (!bill) fail('That bill does not exist');
       if (bill.status === 'VOID') throw new ConflictException('This bill is already void');
       const payments = await liveSettlementNumbers(tx, { billId: id });
@@ -297,7 +298,7 @@ export class PurchaseBillsService {
       if (linked.length) fail('Pick the purchase order these lines fill');
       return;
     }
-    await tx.$queryRaw`SELECT 1 FROM "PurchaseOrder" WHERE "id" = ${dto.purchaseOrderId}::uuid FOR UPDATE`;
+    await lockRows(tx, 'PurchaseOrder', dto.purchaseOrderId);
     const order = await tx.purchaseOrder.findUnique({
       where: { id: dto.purchaseOrderId },
       select: {

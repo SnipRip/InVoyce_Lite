@@ -29,6 +29,7 @@ import {
 import { creditLeft, creditNotePartyAmount, debitNotePartyAmount, noteUsage } from '../notes/note-credit.js';
 import { cashReceivedOn } from '../journals/journal-cash.js';
 import { settlementInclude, toSettlementView, type OpenDocumentView, type SettlementView } from './settlement-views.js';
+import { lockRows } from '../database/sql.js';
 
 type Tx = Prisma.TransactionClient;
 type Db = Tx | PrismaService;
@@ -145,8 +146,8 @@ export class SettlementsService {
       const owner = await tx.settlement.findUnique({ where: { id }, select: { partyId: true } });
       if (!owner) throw new NotFoundException('That receipt or payment does not exist');
       const party = await lockParty(tx, owner.partyId);
-      const [settlement] = await tx.$queryRaw<{ direction: SettlementDirection; partyId: string; amount: Prisma.Decimal; tds: Prisma.Decimal; cancelledAt: Date | null }[]>`
-        SELECT "direction", "partyId", "amount", "tds", "cancelledAt" FROM "Settlement" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      await lockRows(tx, 'Settlement', id);
+      const settlement = await tx.settlement.findUniqueOrThrow({ where: { id }, select: { direction: true, partyId: true, amount: true, tds: true, cancelledAt: true } });
       if (settlement.cancelledAt) throw new ConflictException(`This ${WORD[settlement.direction]} is cancelled`);
       if (dto.allocations.length === 0) fail('Pick what to apply it to');
       if (dto.allocations.some((allocation) => isRefundKind(allocation.kind))) fail('An advance or a note’s credit is refunded on a refund entry of its own');
@@ -164,8 +165,8 @@ export class SettlementsService {
   /** Cancels a receipt or payment entered by mistake: its allocations stop counting and its number stays cancelled. */
   cancel(id: string, reason: string): Promise<SettlementView> {
     return this.prisma.$transaction(async (tx) => {
-      const [settlement] = await tx.$queryRaw<{ direction: SettlementDirection; issuedNumberId: string; cancelledAt: Date | null }[]>`
-        SELECT "direction", "issuedNumberId", "cancelledAt" FROM "Settlement" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      await lockRows(tx, 'Settlement', id);
+      const settlement = (await tx.settlement.findUnique({ where: { id }, select: { direction: true, issuedNumberId: true, cancelledAt: true } }))!;
       if (!settlement) throw new NotFoundException('That receipt or payment does not exist');
       if (settlement.cancelledAt) throw new ConflictException(`This ${WORD[settlement.direction]} is already cancelled`);
       const refunds = await liveSettlementNumbers(tx, { advanceId: id });
@@ -318,14 +319,14 @@ export class SettlementsService {
     }
     const invoiceIds = allocations.filter((allocation) => allocation.kind === 'INVOICE').map((allocation) => allocation.documentId).sort();
     const billIds = allocations.filter((allocation) => allocation.kind === 'BILL').map((allocation) => allocation.documentId).sort();
-    if (invoiceIds.length) await tx.$queryRaw`SELECT 1 FROM "Invoice" WHERE "id" = ANY(${invoiceIds}::uuid[]) ORDER BY "id" FOR UPDATE`;
-    if (billIds.length) await tx.$queryRaw`SELECT 1 FROM "PurchaseBill" WHERE "id" = ANY(${billIds}::uuid[]) ORDER BY "id" FOR UPDATE`;
+    if (invoiceIds.length) await lockRows(tx, 'Invoice', invoiceIds);
+    if (billIds.length) await lockRows(tx, 'PurchaseBill', billIds);
     const expenseIds = allocations.filter((allocation) => allocation.kind === 'EXPENSE').map((allocation) => allocation.documentId).sort();
-    if (expenseIds.length) await tx.$queryRaw`SELECT 1 FROM "Expense" WHERE "id" = ANY(${expenseIds}::uuid[]) ORDER BY "id" FOR UPDATE`;
+    if (expenseIds.length) await lockRows(tx, 'Expense', expenseIds);
     const advanceIds = allocations.filter((allocation) => allocation.kind === 'ADVANCE').map((allocation) => allocation.documentId).sort();
-    if (advanceIds.length) await tx.$queryRaw`SELECT 1 FROM "Settlement" WHERE "id" = ANY(${advanceIds}::uuid[]) ORDER BY "id" FOR UPDATE`;
+    if (advanceIds.length) await lockRows(tx, 'Settlement', advanceIds);
     const journalLineIds = allocations.filter((allocation) => allocation.kind === 'JOURNAL').map((allocation) => allocation.documentId).sort();
-    if (journalLineIds.length) await tx.$queryRaw`SELECT 1 FROM "JournalLine" WHERE "id" = ANY(${journalLineIds}::uuid[]) ORDER BY "id" FOR UPDATE`;
+    if (journalLineIds.length) await lockRows(tx, 'JournalLine', journalLineIds);
     const journalLines = new Map(
       (
         await tx.journalLine.findMany({
@@ -335,9 +336,9 @@ export class SettlementsService {
       ).map((row) => [row.id, row]),
     );
     const creditNoteIds = allocations.filter((allocation) => allocation.kind === 'CREDIT_NOTE').map((allocation) => allocation.documentId).sort();
-    if (creditNoteIds.length) await tx.$queryRaw`SELECT 1 FROM "CreditNote" WHERE "id" = ANY(${creditNoteIds}::uuid[]) ORDER BY "id" FOR UPDATE`;
+    if (creditNoteIds.length) await lockRows(tx, 'CreditNote', creditNoteIds);
     const debitNoteIds = allocations.filter((allocation) => allocation.kind === 'DEBIT_NOTE').map((allocation) => allocation.documentId).sort();
-    if (debitNoteIds.length) await tx.$queryRaw`SELECT 1 FROM "DebitNote" WHERE "id" = ANY(${debitNoteIds}::uuid[]) ORDER BY "id" FOR UPDATE`;
+    if (debitNoteIds.length) await lockRows(tx, 'DebitNote', debitNoteIds);
     const creditNotes = new Map(
       (await tx.creditNote.findMany({ where: { id: { in: creditNoteIds } }, select: { id: true, number: true, partyId: true, cancelledAt: true, regime: true, total: true, igst: true } })).map((row) => [row.id, row]),
     );
@@ -425,10 +426,11 @@ export class SettlementsService {
 }
 
 async function lockParty(tx: Tx, partyId: string): Promise<PartyFacts | null> {
-  const [party] = await tx.$queryRaw<PartyFacts[]>`
-    SELECT "isCustomer", "isVendor", "isArchived", "openingBalance", "openingBalanceSide"
-    FROM "Party" WHERE "id" = ${partyId}::uuid FOR UPDATE`;
-  return party ?? null;
+  await lockRows(tx, 'Party', partyId);
+  return tx.party.findUnique({
+    where: { id: partyId },
+    select: { isCustomer: true, isVendor: true, isArchived: true, openingBalance: true, openingBalanceSide: true },
+  });
 }
 
 /** A credit allocation counts while its source stands: a live credit or debit note, or a journal not cancelled. */
