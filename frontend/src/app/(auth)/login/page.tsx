@@ -11,7 +11,9 @@ export default function LoginPage() {
     <div className="relative flex min-h-screen items-center justify-center px-4 py-8">
       <PageBackdrop />
       <main className="glass relative flex w-full max-w-[380px] flex-col gap-5 px-7 pt-7 pb-6 [--glass-radius:14px]" data-elevation="floating">
-        <BrandLogo height={48} priority />
+        <div className="flex justify-center">
+          <BrandLogo height={48} priority />
+        </div>
         <div className="flex flex-col gap-1">
           <h1 className="text-xl leading-tight font-semibold tracking-[-0.01em]">Sign in</h1>
           <p className="text-[13px] text-muted">Use the email your administrator set up for you.</p>
